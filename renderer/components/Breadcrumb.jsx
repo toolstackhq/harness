@@ -10,8 +10,10 @@ export default function Breadcrumb({ items = [] }) {
             {i > 0 && <span className="breadcrumb__sep">›</span>}
             {last ? (
               <span className="breadcrumb__current">{item.label}</span>
+            ) : item.onClick ? (
+              <span className="breadcrumb__link" onClick={item.onClick} title={item.title}>{item.label}</span>
             ) : (
-              <span className="breadcrumb__link" onClick={item.onClick}>{item.label}</span>
+              <span className="breadcrumb__muted" title={item.title}>{item.label}</span>
             )}
           </React.Fragment>
         );

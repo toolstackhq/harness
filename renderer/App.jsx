@@ -137,15 +137,21 @@ export default function App() {
     }
   };
 
+  const canLeave = !session || session.stopped;
+  const goHome = canLeave
+    ? async () => { if (session) await window.recrd.recorder.close(); }
+    : null;
+  const homeTitle = canLeave ? "Back to sessions" : "Stop recording to leave";
+
   const breadcrumb = session
     ? [
-        { label: "Recrd", onClick: () => {} },
-        { label: "Sessions", onClick: () => {} },
+        { label: "Recrd", onClick: goHome, title: homeTitle },
+        { label: "Sessions", onClick: goHome, title: homeTitle },
         { label: session.stopped ? "Review" : "Recording" }
       ]
     : [
-        { label: "Recrd", onClick: () => {} },
-        { label: "Sessions", onClick: () => {} },
+        { label: "Recrd" },
+        { label: "Sessions" },
         { label: "New session" }
       ];
 
@@ -159,7 +165,10 @@ export default function App() {
                 label: session.recordType === "doc" ? "Generate PDF" : "Generate Script",
                 icon: session.recordType === "doc" ? "save" : "code",
                 onClick: onGenerate,
-                disabled: steps.length === 0
+                disabled: steps.length === 0 || !session.stopped,
+                title: !session.stopped
+                  ? "Stop recording first"
+                  : (steps.length === 0 ? "No steps yet" : "Generate output")
               }
             : null
         }
@@ -169,7 +178,10 @@ export default function App() {
                 label: session.recordType === "doc" ? "Export HTML" : "Export Journey",
                 icon: "save",
                 onClick: () => onOpenJourney("html"),
-                disabled: steps.length === 0
+                disabled: steps.length === 0 || !session.stopped,
+                title: !session.stopped
+                  ? "Stop recording first"
+                  : (steps.length === 0 ? "No steps yet" : "Export as HTML")
               }
             : null
         }

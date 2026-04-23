@@ -5,7 +5,7 @@ function ActionButton({ action, variant }) {
   if (!action) return null;
   const cls = variant === "secondary" ? "btn btn--secondary" : "btn btn--primary";
   return (
-    <button className={cls} onClick={action.onClick} disabled={action.disabled} title={action.title}>
+    <button className={cls} onClick={action.onClick} disabled={action.disabled} title={action.title || action.label}>
       {action.icon === "play" && <Play size={18} />}
       {action.icon === "code" && <Code size={18} />}
       {action.icon === "save" && <Save size={16} />}

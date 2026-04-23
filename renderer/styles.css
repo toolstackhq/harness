@@ -103,6 +103,8 @@ a:hover { text-decoration: underline; }
   flex-shrink: 0;
 }
 .breadcrumb__link { color: var(--blue); cursor: pointer; }
+.breadcrumb__link:hover { text-decoration: underline; }
+.breadcrumb__muted { color: var(--grey-600); }
 .breadcrumb__sep { color: var(--grey-400); }
 .breadcrumb__current { color: var(--grey-900); }
 

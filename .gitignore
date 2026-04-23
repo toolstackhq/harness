@@ -1,0 +1,9 @@
+node_modules/
+renderer-dist/
+*.log
+.DS_Store
+.env
+.env.*
+i.png
+2.png
+.codex

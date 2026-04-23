@@ -483,6 +483,73 @@ to iterate on a custom mapping.
 
 ---
 
+### US-27 — Assertions
+
+**Title:** Let the user add `expect(...)` assertions to a recording;
+render them natively in every framework output
+
+**Description:** Recorded scripts without assertions aren't real
+tests. A dedicated assert step kind lets a user attach
+visibility / text / value expectations to any selector, and every
+codegen path emits the framework-idiomatic call.
+
+**Acceptance:**
+- New assert step kind with `{assertionType, expected, locator}`
+  where assertionType ∈ visible | hidden | text | contains | value.
+- Add Assertion toolbar button (Script Gen only) plus Ctrl+Shift+A
+  shortcut. Modal pre-fills the selector from the last interactive
+  step; expected field only renders when the chosen type needs it.
+- Codegen:
+  - Playwright → `await expect(locator).toBeVisible()` /
+    `.toHaveText()` / `.toContainText()` / `.toHaveValue()` /
+    `.toBeHidden()`; import switches to `@playwright/test` when
+    assertions are present.
+  - Cypress → `.should('be.visible' | 'have.text' | 'contain' |
+    'have.value' | 'not.be.visible')`.
+  - Selenium → inline `isDisplayed / getText / getAttribute`
+    checks that throw on mismatch.
+  - Custom mapping → `assertVisible`, `assertHidden`,
+    `assertText`, `assertContains`, `assertValue` keys.
+- StepList renders asserts on a green-bg card with a check icon.
+- HTML / PDF render asserts as a green callout block.
+- Replay engine skips asserts (no-op, passes instantly). Full
+  replay-side verification is deferred.
+
+**Commits:**
+- `0b323f4` feat(recorder): mutation API + assertion step kind
+- `70a5d9e` feat(ui): per-step edit/delete + Add Assertion dialog
+
+---
+
+### US-26 — Per-step edit / delete
+
+**Title:** Let users fix or drop an individual step without
+re-recording the whole flow
+
+**Description:** Until now `Clear` was the only way to undo a
+capture — nuclear if you had 30 good steps and one bad one. Users
+need to delete a single step or override its selector / value.
+
+**Acceptance:**
+- Recorder persists `number` on each event (was previously only
+  carried on the emitted copy) and loadSteps preserves it, so a
+  stable key exists for mutations.
+- New recorder methods: `deleteStepByNumber(n)`,
+  `updateStepByNumber(n, patch)`. Patch accepts `value`, `text`,
+  `expected`, or `selector` — overriding a selector clears the
+  shadow chain and marks quality = "manual".
+- Step rows show a hover-revealed ⋯ menu with Edit (opens
+  StepEditDialog) and Delete (confirms, then removes). Navigate
+  steps allow Delete but not Edit.
+- `steps:changed` IPC broadcasts the fresh step list after any
+  mutation so the renderer stays in sync without polling.
+
+**Commits:**
+- `0b323f4` feat(recorder): mutation API + assertion step kind
+- `70a5d9e` feat(ui): per-step edit/delete + Add Assertion dialog
+
+---
+
 ### US-25 — Navigable breadcrumb + Generate guardrail
 
 **Title:** Breadcrumb segments actually navigate, and the Generate

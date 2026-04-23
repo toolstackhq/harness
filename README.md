@@ -483,6 +483,105 @@ to iterate on a custom mapping.
 
 ---
 
+### US-25 — Navigable breadcrumb + Generate guardrail
+
+**Title:** Breadcrumb segments actually navigate, and the Generate
+/ Export actions stay disabled until recording is stopped
+
+**Description:** Two small-but-real UX bugs reported together:
+
+1. Breadcrumb rows *looked* like links (blue text, pointer) but
+   clicking them did nothing.
+2. Users were unsure whether to click Generate Script before or
+   after Stop, because the primary action was always enabled.
+
+**Acceptance:**
+- Breadcrumb renders non-clickable segments as grey-600 plain
+  text (no pointer, no hover underline) — visually distinct from
+  a live link.
+- "Recrd" and "Sessions" become real links only when the session
+  is stopped (or absent); clicking closes the session and
+  returns to startup, matching the "New Session" toolbar button.
+- Primary Generate Script / Generate PDF and secondary Export
+  Journey stay `disabled` while the REC chip is showing. Tooltip
+  reads "Stop recording first".
+- `AppBar`'s `ActionButton` now falls back to the label as tooltip
+  when no explicit title is provided, so disabled buttons explain
+  themselves on hover.
+
+**Commits:**
+- `2ae554d` fix(ui): functional breadcrumb + gate Generate/Export behind Stop
+
+---
+
+### US-24 — Narrative notes (comments in scripts, callouts in docs)
+
+**Title:** Let users attach free-text notes to a recording; render
+them as code comments in Script Gen and as orange callout cards in
+Doc Gen
+
+**Description:** The recorder only captures clicks / fills /
+navigations, but writing a runnable doc or a well-commented test
+often needs narrative — "verify this login CTA is wired up",
+"locator is text-matched, replace with data-testid in prod", etc.
+A dedicated note step lets users attach that context to a specific
+page state.
+
+Hijacking the embedded browser's right-click was considered but
+rejected: it would break inspect / copy-link / normal web
+behaviour. Instead: a toolbar button and a keyboard shortcut.
+
+**Acceptance:**
+- Recorder exposes `addNote(text)` which pushes a `note` step and
+  schedules a `capturePage` so the note is anchored to a page
+  screenshot.
+- Browser toolbar gains an "Add Note" button (session active,
+  recording or paused); Ctrl+Shift+N works globally in the
+  window. Composer dialog: textarea, Esc cancels, Ctrl+Enter
+  saves.
+- Step panel renders notes on an orange-bg card with a note-book
+  icon and italic first line; click to expand.
+- Playwright / Cypress / Selenium codegen emit `// {text}` inline
+  at the note's chronological position. Custom mapping gains a
+  default `note: "// {text}"` which users can override.
+- HTML / PDF walkthrough renders notes as a distinct orange
+  callout card with the note text above the captured screenshot.
+- Replay engine skips note kinds silently (they are not actions).
+
+**Commits:**
+- `d3b2ccb` feat(recorder): note step — narrative comments + doc callouts
+- `7f0d908` feat(ui): Add Note button + composer + orange note rows
+
+---
+
+### US-23 — Offline / corporate-network installability
+
+**Title:** Support installing the app on networks where Chromium
+binary downloads are blocked
+
+**Description:** `npm install` fetches the Electron Chromium
+binary from GitHub releases, which is commonly blocked on
+corporate or air-gapped networks. The project needs documented
+escape hatches (mirror, cache, skip) and a template so a new
+developer can be productive without asking IT about unblocking
+GitHub.
+
+**Acceptance:**
+- README has a "Corporate networks / offline installs" section
+  covering `ELECTRON_MIRROR`, `ELECTRON_CUSTOM_DIR`,
+  `ELECTRON_CACHE`, and `ELECTRON_SKIP_BINARY_DOWNLOAD`.
+- `.npmrc.example` checked in as a template with commented keys
+  for the common cases.
+- `.npmrc` git-ignored so per-developer mirror URLs don't leak.
+- Documentation clarifies that once installed, the app needs no
+  further Electron-related network access; only the recorded
+  target URL traffic, which flows through the system proxy.
+
+**Commits:**
+- `8ee5181` docs: corporate-network + offline install instructions
+
+---
+
 ### US-22 — PDF walkthrough with bounding-box annotations
 
 **Title:** Generate a print-ready PDF user guide from a Doc Gen

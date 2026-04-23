@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Back, Forward, Reload } from "./Icons.jsx";
+import { Back, Forward, Reload, Note } from "./Icons.jsx";
 
 function formatElapsed(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -16,7 +16,9 @@ export default function BrowserToolbar({
   onReload,
   startedAt,
   recording,
-  onNewSession
+  onNewSession,
+  onAddNote,
+  canAddNote
 }) {
   const [value, setValue] = useState(url || "");
   const [elapsed, setElapsed] = useState(0);
@@ -54,6 +56,16 @@ export default function BrowserToolbar({
           disabled={!recording}
         />
       </form>
+      {canAddNote && (
+        <button
+          className="btn btn--secondary"
+          style={{ height: 32, padding: "0 10px", fontSize: 12 }}
+          onClick={onAddNote}
+          title="Add a note to the recording (Ctrl+Shift+N)"
+        >
+          <Note size={14} /> Add note
+        </button>
+      )}
       {recording ? (
         <div className="rec-chip">
           <span className="rec-chip__dot" />

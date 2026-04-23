@@ -473,6 +473,18 @@ a:hover { text-decoration: underline; }
 .step--live { background: var(--green-bg); border-left-color: var(--green-bar); }
 .step--active { background: var(--blue-light); border-left-color: var(--blue); }
 .step--shadow { background: var(--teal-bg); border-left-color: var(--teal); }
+.step--note-type { background: var(--orange-bg); border-left-color: var(--orange); }
+.step--note-type .step__icon { background: var(--orange-bg); color: var(--orange); }
+.step__note-text {
+  font-size: 12px;
+  color: var(--grey-900);
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-style: italic;
+}
+.step--expanded .step__note-text { white-space: normal; overflow: visible; }
 .step__num {
   font-family: var(--mono);
   font-size: 11px;

@@ -4,6 +4,7 @@ import { actionIcon, Check, Close, Spinner, Play } from "./Icons.jsx";
 function describe(step) {
   const loc = step.locator || {};
   const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
+  if (step.kind === "note") return { action: "note", target: (step.text || "").split("\n")[0] };
   if (step.kind === "navigate") return { action: "navigate", target: step.url || "" };
   if (step.kind === "fill") return { action: "fill", target: `${label} = ${JSON.stringify(step.value ?? "")}` };
   if (step.kind === "check") return { action: step.checked ? "check" : "uncheck", target: label };
@@ -21,11 +22,13 @@ function Row({ step, live, replayStatus, replayDim, replayError, replayDuration 
   const ActionIcon = actionIcon(step.kind);
   const { action, target } = describe(step);
 
+  const isNote = step.kind === "note";
   const cls = ["step", "step--clickable"];
-  if (replayStatus === "running") cls.push("step--running");
-  else if (replayStatus === "pass") cls.push("step--pass");
+  if (replayStatus === "running" && !isNote) cls.push("step--running");
+  else if (replayStatus === "pass" && !isNote) cls.push("step--pass");
   else if (replayStatus === "fail") cls.push("step--fail");
   else if (live) cls.push("step--live");
+  else if (isNote) cls.push("step--note-type");
   else if (hasShadow) cls.push("step--shadow");
   if (replayDim) cls.push("step--dim");
   if (expanded) cls.push("step--expanded");
@@ -56,12 +59,16 @@ function Row({ step, live, replayStatus, replayDim, replayError, replayDuration 
             <span className="step__duration">{replayDuration}ms</span>
           )}
         </div>
-        <div className="step__selector">
-          {hasShadow && (
-            <span className="step__shadow-chain">{loc.shadowChain.join(" » ")} » </span>
-          )}
-          {selector}
-        </div>
+        {isNote ? (
+          <div className="step__note-text">{step.text || ""}</div>
+        ) : (
+          <div className="step__selector">
+            {hasShadow && (
+              <span className="step__shadow-chain">{loc.shadowChain.join(" » ")} » </span>
+            )}
+            {selector}
+          </div>
+        )}
         {replayStatus === "fail" && replayError && (
           <div className="step__error" title={replayError}>{replayError}</div>
         )}

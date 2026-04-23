@@ -8,6 +8,7 @@ export default function RecordingScreen({
   initialSteps,
   autoReplay,
   onNewSession,
+  onAddNote,
   onStepsChange
 }) {
   const [url, setUrl] = useState(session.url);
@@ -137,6 +138,8 @@ export default function RecordingScreen({
         onForward={() => window.recrd.browser.forward()}
         onReload={() => window.recrd.browser.reload()}
         onNewSession={onNewSession}
+        canAddNote={true}
+        onAddNote={onAddNote}
       />
       <InfoBar
         cdp={recording}

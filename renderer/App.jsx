@@ -6,6 +6,7 @@ import RecordingScreen from "./components/RecordingScreen.jsx";
 import ScriptDialog from "./components/ScriptDialog.jsx";
 import SessionDetailModal from "./components/SessionDetailModal.jsx";
 import JourneyExportDialog from "./components/JourneyExportDialog.jsx";
+import NoteComposer from "./components/NoteComposer.jsx";
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -15,6 +16,7 @@ export default function App() {
   const [dialog, setDialog] = useState(null);
   const [detail, setDetail] = useState(null);
   const [journey, setJourney] = useState(null);
+  const [noteOpen, setNoteOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -61,6 +63,32 @@ export default function App() {
   const onNewSession = async () => {
     await window.recrd.recorder.close();
   };
+
+  const onAddNote = () => {
+    if (!session) return;
+    setNoteOpen(true);
+  };
+  const saveNote = async (text) => {
+    const result = await window.recrd.recorder.addNote(text);
+    if (!result?.ok) {
+      alert(result?.error || "Failed to add note.");
+      return false;
+    }
+    return true;
+  };
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "N" || e.key === "n")) {
+        if (session) {
+          e.preventDefault();
+          setNoteOpen(true);
+        }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [session]);
 
   const onGenerate = async () => {
     if (!session) return;
@@ -154,6 +182,7 @@ export default function App() {
           initialSteps={initialSteps}
           autoReplay={autoReplay}
           onNewSession={onNewSession}
+          onAddNote={onAddNote}
           onStepsChange={setSteps}
         />
       ) : (
@@ -176,6 +205,12 @@ export default function App() {
           steps={journey.steps}
           defaultFormat={journey.defaultFormat || "html"}
           onClose={closeJourney}
+        />
+      )}
+      {noteOpen && (
+        <NoteComposer
+          onSave={saveNote}
+          onClose={() => setNoteOpen(false)}
         />
       )}
       {detail && (

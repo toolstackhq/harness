@@ -6,6 +6,7 @@ const CHIP = { playwright: "PW", cypress: "CY", selenium: "SE", custom: "CX" };
 function describe(step) {
   const loc = step.locator || {};
   const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
+  if (step.kind === "note") return { action: "note", target: (step.text || "").split("\n")[0] };
   if (step.kind === "navigate") return { action: "navigate", target: step.url || "" };
   if (step.kind === "fill") return { action: "fill", target: `${label} = ${JSON.stringify(step.value ?? "")}` };
   if (step.kind === "check") return { action: step.checked ? "check" : "uncheck", target: label };

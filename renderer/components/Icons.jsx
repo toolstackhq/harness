@@ -32,6 +32,7 @@ export const Logo = ({ size = 16 }) => (
 );
 
 export const Trash = (p) => <I {...p} d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />;
+export const Note = (p) => <I {...p} d="M3 3v18h18V3H3zm15 15H6V6h12v12zM8 8h8v2H8V8zm0 3h8v2H8v-2zm0 3h5v2H8v-2z" />;
 
 export const Spinner = ({ size = 16 }) => (
   <span
@@ -50,6 +51,7 @@ export const actionIcon = (kind) => {
     case "press": return Press;
     case "submit": return Submit;
     case "navigate": return Nav;
+    case "note": return Note;
     default: return Click;
   }
 };

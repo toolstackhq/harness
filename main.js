@@ -185,6 +185,25 @@ function createBrowserView(initialUrl) {
     if (errorCode === -3) return;
     emitToRenderer("browser:load-failed", { url: validatedURL, description: errorDescription });
   });
+  let shotTimer = null;
+  const scheduleShot = () => {
+    if (shotTimer) clearTimeout(shotTimer);
+    shotTimer = setTimeout(async () => {
+      if (!state.recorder || !state.browserView || state.browserView !== view) return;
+      try {
+        const image = await view.webContents.capturePage();
+        if (image.isEmpty()) return;
+        const resized = image.resize({ width: 800 });
+        const dataUrl = resized.toDataURL();
+        const updated = state.recorder.attachLatestNavigateScreenshot(dataUrl);
+        if (updated) emitToRenderer("step:screenshot", { dataUrl });
+      } catch (err) {
+        console.warn("capturePage failed:", err?.message || err);
+      }
+    }, 400);
+  };
+  view.webContents.on("did-finish-load", scheduleShot);
+  view.webContents.on("did-navigate-in-page", scheduleShot);
   view.webContents.loadURL(initialUrl);
   return view;
 }
@@ -496,9 +515,170 @@ function registerIpc() {
     return startReplayOnlySession({ url: sess.url, steps: sess.steps || [], framework: sess.framework });
   });
 
+  ipcMain.handle("journey:get-steps", () => {
+    if (!state.recorder) return { ok: false, steps: [] };
+    return { ok: true, steps: state.recorder.getSteps(), session: state.session };
+  });
+
+  ipcMain.handle("journey:export", async (_e, { indices, title }) => {
+    if (!state.recorder) return { ok: false, error: "No active session" };
+    const all = state.recorder.getSteps();
+    const selection = Array.isArray(indices) ? indices : all.map((_, i) => i);
+    const steps = selection
+      .map((i) => ({ index: i, step: all[i] }))
+      .filter((e) => e.step);
+    if (!steps.length) return { ok: false, error: "No steps selected" };
+    const meta = {
+      url: state.session?.url || "",
+      framework: state.session?.framework || "",
+      startedAt: state.session?.startedAt || Date.now(),
+      title: title || state.session?.url || "User journey"
+    };
+    const html = renderJourneyHtml(steps, meta);
+    const stamp = new Date(meta.startedAt).toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    const defaultPath = `journey-${stamp}.html`;
+    const result = await dialog.showSaveDialog(state.mainWindow, {
+      title: "Export user journey",
+      defaultPath,
+      filters: [{ name: "HTML", extensions: ["html", "htm"] }]
+    });
+    if (result.canceled || !result.filePath) return { ok: false };
+    fs.writeFileSync(result.filePath, html, "utf8");
+    return { ok: true, path: result.filePath };
+  });
+
   ipcMain.handle("shell:open-external", (_e, url) => {
     try { shell.openExternal(url); return { ok: true }; } catch (err) { return { ok: false, error: String(err) }; }
   });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function describeStep(step) {
+  const loc = step.locator || {};
+  const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
+  if (step.kind === "navigate") return { action: "Navigate", target: step.url || "" };
+  if (step.kind === "fill") return { action: "Fill", target: label, value: step.value ?? "" };
+  if (step.kind === "check") return { action: step.checked ? "Check" : "Uncheck", target: label };
+  if (step.kind === "select") return { action: "Select", target: label, value: step.value ?? "" };
+  if (step.kind === "press") return { action: `Press ${step.key || "Enter"}`, target: label };
+  if (step.kind === "submit") return { action: "Submit", target: label };
+  if (step.kind === "click") return { action: "Click", target: label };
+  return { action: step.kind, target: label };
+}
+
+function renderJourneyHtml(selection, meta) {
+  const when = new Date(meta.startedAt).toLocaleString();
+  const title = escapeHtml(meta.title);
+  const rows = selection.map(({ index, step }, i) => {
+    const loc = step.locator || {};
+    const chain = Array.isArray(loc.shadowChain) && loc.shadowChain.length
+      ? loc.shadowChain.join(" » ") + " » "
+      : "";
+    const selector = step.kind === "navigate" ? "" : (loc.css || loc.xpath || "");
+    const d = describeStep(step);
+    const screenshot = step.screenshot
+      ? `<img class="shot" src="${step.screenshot}" alt="Screenshot for step ${index + 1}" />`
+      : "";
+    const valueBlock = d.value !== undefined
+      ? `<div class="row"><span class="k">Value</span><code class="v">${escapeHtml(JSON.stringify(d.value))}</code></div>`
+      : "";
+    const selectorBlock = selector
+      ? `<div class="row"><span class="k">Selector</span><code class="v"><span class="chain">${escapeHtml(chain)}</span>${escapeHtml(selector)}</code></div>`
+      : "";
+    const targetBlock = `<div class="row"><span class="k">Target</span><span class="v">${escapeHtml(d.target)}</span></div>`;
+    return `
+      <section class="step">
+        <div class="num">${String(i + 1).padStart(2, "0")}</div>
+        <div class="body">
+          <div class="headline">${escapeHtml(d.action)}</div>
+          ${targetBlock}
+          ${selectorBlock}
+          ${valueBlock}
+          ${screenshot}
+        </div>
+      </section>`;
+  }).join("\n");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>${title}</title>
+  <style>
+    :root {
+      --blue:#1a73e8; --blue-dark:#1557b0; --blue-light:#e8f0fe;
+      --teal:#00796b; --teal-bg:#e0f2f1;
+      --grey-50:#f8f9fa; --grey-100:#f1f3f4; --grey-200:#e8eaed;
+      --grey-300:#dadce0; --grey-600:#80868b; --grey-700:#5f6368;
+      --grey-800:#3c4043; --grey-900:#202124;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 32px 20px;
+      font: 14px/1.5 'Google Sans','Roboto',system-ui,sans-serif;
+      color: var(--grey-900); background: var(--grey-50);
+    }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    header {
+      background: white; border: 1px solid var(--grey-300); border-radius: 8px;
+      padding: 20px 24px; margin-bottom: 20px;
+    }
+    h1 { font: 500 20px/1.3 inherit; margin: 0 0 8px; color: var(--grey-900); }
+    .meta { font-size: 13px; color: var(--grey-700); display: flex; flex-wrap: wrap; gap: 16px; }
+    .meta span { display: inline-flex; align-items: center; gap: 6px; }
+    .chip {
+      font: 500 11px/1 'Roboto Mono',monospace;
+      padding: 4px 8px; border-radius: 10px; background: var(--blue-light); color: var(--blue-dark);
+    }
+    .step {
+      background: white; border: 1px solid var(--grey-300); border-radius: 8px;
+      padding: 16px 20px; margin-bottom: 12px;
+      display: grid; grid-template-columns: 32px 1fr; gap: 16px;
+    }
+    .num {
+      font: 500 13px/1 'Roboto Mono',monospace;
+      color: var(--grey-600); padding-top: 2px; text-align: right;
+    }
+    .body { min-width: 0; }
+    .headline { font-weight: 500; color: var(--grey-900); font-size: 15px; margin-bottom: 8px; }
+    .row { display: flex; gap: 10px; margin-top: 6px; align-items: baseline; }
+    .k {
+      font-size: 11px; font-weight: 500; color: var(--grey-700);
+      text-transform: uppercase; letter-spacing: 0.5px; width: 70px; flex-shrink: 0;
+    }
+    .v { font-size: 13px; color: var(--grey-800); word-break: break-word; min-width: 0; }
+    code.v { font-family: 'Roboto Mono', monospace; font-size: 12px; background: var(--grey-100); padding: 2px 6px; border-radius: 3px; }
+    .chain { color: var(--teal); }
+    .shot {
+      display: block; margin-top: 12px; max-width: 100%;
+      border: 1px solid var(--grey-300); border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>${title}</h1>
+      <div class="meta">
+        <span>Recorded ${escapeHtml(when)}</span>
+        <span>Framework <span class="chip">${escapeHtml(meta.framework.toUpperCase())}</span></span>
+        <span>${selection.length} step${selection.length === 1 ? "" : "s"}</span>
+      </div>
+    </header>
+    <main>
+${rows}
+    </main>
+  </div>
+</body>
+</html>`;
 }
 
 app.whenReady().then(() => {

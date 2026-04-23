@@ -54,6 +54,11 @@ contextBridge.exposeInMainWorld("recrd", {
     save: (payload) => invoke("script:save", payload),
     copy: (code) => invoke("script:copy", code)
   },
+  journey: {
+    getSteps: () => invoke("journey:get-steps"),
+    export: (payload) => invoke("journey:export", payload),
+    onScreenshot: (handler) => on("step:screenshot", handler)
+  },
   sessions: {
     load: () => invoke("sessions:load"),
     delete: (id) => invoke("sessions:delete", id),

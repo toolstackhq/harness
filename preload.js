@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld("recrd", {
     stop: () => invoke("recorder:stop"),
     close: () => invoke("recorder:close"),
     clear: () => invoke("recorder:clear"),
+    addNote: (text) => invoke("recorder:add-note", text),
     state: () => invoke("recorder:state"),
     onStep: (handler) => on("step:recorded", handler),
     onCleared: (handler) => on("recorder:cleared", handler),

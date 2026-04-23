@@ -428,6 +428,15 @@ function registerIpc() {
   ipcMain.handle("recorder:stop", () => pauseRecording());
   ipcMain.handle("recorder:close", () => closeSession());
   ipcMain.handle("recorder:clear", () => clearSteps());
+  ipcMain.handle("recorder:add-note", async (_e, text) => {
+    if (!state.recorder || !state.session) return { ok: false, error: "No active session" };
+    const trimmed = String(text || "").trim();
+    if (!trimmed) return { ok: false, error: "Empty note" };
+    const url = state.browserView ? state.browserView.webContents.getURL() : state.session.url;
+    state.recorder.addNote(trimmed, { url });
+    scheduleStepCapture();
+    return { ok: true };
+  });
   ipcMain.handle("recorder:state", () => {
     if (!state.recorder) return { recording: false };
     return {
@@ -644,6 +653,7 @@ function escapeHtml(value) {
 function describeStep(step) {
   const loc = step.locator || {};
   const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
+  if (step.kind === "note") return { action: "Note", target: step.text || "" };
   if (step.kind === "navigate") return { action: "Navigate", target: step.url || "" };
   if (step.kind === "fill") return { action: "Fill", target: label, value: step.value ?? "" };
   if (step.kind === "check") return { action: step.checked ? "Check" : "Uncheck", target: label };
@@ -659,13 +669,28 @@ function renderJourneyHtml(selection, meta) {
   const title = escapeHtml(meta.title);
   const callouts = meta.callouts !== false;
   const rows = selection.map(({ index, step }, i) => {
+    const num = String(i + 1).padStart(2, "0");
+    if (step.kind === "note") {
+      const shot = step.screenshot
+        ? `<figure class="shot"><img src="${step.screenshot}" alt="Note context screenshot" /></figure>`
+        : "";
+      const textHtml = escapeHtml(step.text || "").replace(/\n/g, "<br />");
+      return `
+      <section class="step step--note">
+        <div class="num">${num}</div>
+        <div class="body">
+          <div class="headline">📝 Note</div>
+          <div class="note-text">${textHtml}</div>
+          ${shot}
+        </div>
+      </section>`;
+    }
     const loc = step.locator || {};
     const chain = Array.isArray(loc.shadowChain) && loc.shadowChain.length
       ? loc.shadowChain.join(" » ") + " » "
       : "";
     const selector = step.kind === "navigate" ? "" : (loc.css || loc.xpath || "");
     const d = describeStep(step);
-    const num = String(i + 1).padStart(2, "0");
 
     let screenshotBlock = "";
     if (step.screenshot) {
@@ -778,6 +803,17 @@ function renderJourneyHtml(selection, meta) {
       font: 600 11px/22px 'Roboto Mono',monospace;
       text-align: center;
       box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    .step--note {
+      background: var(--orange-bg);
+      border-color: var(--orange);
+    }
+    .step--note .headline { color: var(--orange); }
+    .step--note .note-text {
+      font-size: 14px;
+      color: var(--grey-900);
+      line-height: 1.55;
+      margin: 8px 0 4px;
     }
     @media print {
       body { background: white; padding: 0; }

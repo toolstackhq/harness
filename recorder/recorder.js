@@ -82,6 +82,22 @@ class DebuggerRecorder extends EventEmitter {
     return null;
   }
 
+  addNote(text, info = {}) {
+    const url = info.url || "";
+    const targetId = info.targetId || (this.traces.size > 0 ? [...this.traces.keys()].pop() : "root");
+    const trace = this._ensureTrace(targetId, { url, title: info.title || "" });
+    const event = {
+      kind: "note",
+      ts: now(),
+      targetId,
+      text: String(text || "").trim(),
+      url
+    };
+    trace.events.push(event);
+    this._emitStep(event);
+    return event;
+  }
+
   get stepCount() {
     let total = 0;
     for (const trace of this.traces.values()) total += trace.events.length;

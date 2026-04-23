@@ -41,7 +41,21 @@ function normalizeTrace(input) {
           url,
           title: String(event.title ?? "").trim(),
           ts: Number(event.ts ?? Date.now()),
-          targetId: event.targetId ?? trace.targetId ?? ""
+          targetId: event.targetId ?? trace.targetId ?? "",
+          screenshot: event.screenshot
+        });
+        continue;
+      }
+      if (event.kind === "note") {
+        const text = String(event.text ?? "").trim();
+        if (!text) continue;
+        normalized.push({
+          kind: "note",
+          text,
+          ts: Number(event.ts ?? Date.now()),
+          targetId: event.targetId ?? trace.targetId ?? "",
+          url: String(event.url ?? trace.url ?? "").trim(),
+          screenshot: event.screenshot
         });
         continue;
       }
@@ -173,6 +187,10 @@ function customBindings(step) {
   };
 }
 
+function commentLines(text, indent = "    ") {
+  return String(text || "").split("\n").map((line) => `${indent}// ${line}`).join("\n");
+}
+
 function renderPlaywright(trace) {
   const lines = [
     `import { chromium } from "playwright";`,
@@ -183,6 +201,10 @@ function renderPlaywright(trace) {
     "  try {"
   ];
   for (const step of trace.events) {
+    if (step.kind === "note") {
+      lines.push(commentLines(step.text));
+      continue;
+    }
     if (step.kind === "navigate") {
       lines.push(`    await page.goto(${escapeString(step.url)});`);
       continue;
@@ -203,6 +225,10 @@ function renderPlaywright(trace) {
 function renderCypress(trace) {
   const lines = [`describe(${escapeString(trace.title || "recorded flow")}, () => {`, `  it('replays the flow', () => {`];
   for (const step of trace.events) {
+    if (step.kind === "note") {
+      lines.push(commentLines(step.text));
+      continue;
+    }
     if (step.kind === "navigate") {
       lines.push(`    cy.visit(${escapeString(step.url)});`);
       continue;
@@ -229,6 +255,10 @@ function renderSelenium(trace) {
     "  try {"
   ];
   for (const step of trace.events) {
+    if (step.kind === "note") {
+      lines.push(commentLines(step.text));
+      continue;
+    }
     if (step.kind === "navigate") {
       lines.push(`    await driver.get(${escapeString(step.url)});`);
       continue;
@@ -267,13 +297,25 @@ const DEFAULT_CUSTOM_MAPPING = {
   select: "await this.selectOption('{selector}', '{value}')",
   check: "await this.setChecked('{selector}', {checked})",
   press: "await this.press('{selector}', '{key}')",
-  submit: "await this.submit('{selector}')"
+  submit: "await this.submit('{selector}')",
+  note: "// {text}"
 };
 
 function renderCustom(trace, options = {}) {
   const mapping = { ...DEFAULT_CUSTOM_MAPPING, ...(options.mapping || {}) };
   const lines = [];
   for (const step of trace.events) {
+    if (step.kind === "note") {
+      const tpl = mapping.note;
+      if (!tpl) continue;
+      const text = String(step.text || "");
+      if (tpl === "// {text}") {
+        lines.push(text.split("\n").map((l) => `// ${l}`).join("\n"));
+      } else {
+        lines.push(interpolate(tpl, { ...customBindings(step), text }));
+      }
+      continue;
+    }
     const template = mapping[step.kind];
     if (!template) continue;
     lines.push(interpolate(template, customBindings(step)) + ";");

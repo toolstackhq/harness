@@ -450,6 +450,39 @@ to iterate on a custom mapping.
 
 ---
 
+### US-20 — Export user journey with screenshots
+
+**Title:** Export a reviewable HTML user journey, one screenshot per
+page visited, with per-step opt-in
+
+**Description:** As a user I want to share a human-readable record of
+what I did — steps with targets and an image of each distinct page I
+saw — without needing the test framework output or the raw trace.
+
+Screenshots could explode if taken per click, so we capture exactly
+one per navigation (the page as it finished loading). The export
+dialog lets me opt individual steps in or out before saving.
+
+**Acceptance:**
+- Main process hooks `did-finish-load` and `did-navigate-in-page`
+  on the embedded browser, debounces 400 ms, calls
+  `capturePage()`, resizes to 800 px wide, attaches a data URL to
+  the most recent navigate step that does not yet have one.
+- App bar gains a secondary "Export Journey" button left of the
+  primary Generate Script button (disabled until there are steps).
+- Journey export dialog lists every step with a checkbox, Select
+  all / Select none toggles, and a "screenshot" chip where an image
+  is attached.
+- `journey:export` renders a self-contained HTML report (inline
+  base64 images, Google-style tokens) and writes it via
+  `dialog.showSaveDialog`.
+
+**Commits:**
+- `1695ed5` feat(recorder): capture one screenshot per page visit
+- `d0d8b94` feat(ui): Export Journey button and opt-in/out dialog
+
+---
+
 ### US-19 — Reviewable step rows (click to expand long selectors)
 
 **Title:** Long URLs, long selectors, and long error messages are

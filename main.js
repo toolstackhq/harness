@@ -330,6 +330,14 @@ async function runReplay(steps) {
 async function startReplayOnlySession({ url, steps, framework }) {
   await closeSession();
   createBrowserView(url);
+  const settings = getSettings();
+  const recorder = new DebuggerRecorder(state.browserView.webContents, {
+    target: framework,
+    customMapping: settings.customMapping
+  });
+  recorder.paused = true;
+  recorder.loadSteps(steps || [], { url, targetId: "loaded" });
+  state.recorder = recorder;
   state.session = {
     id: newId(),
     startedAt: Date.now(),
@@ -412,15 +420,20 @@ function registerIpc() {
   });
 
   ipcMain.handle("script:generate", (_e, options) => {
-    const settings = getSettings();
-    const target = options?.framework || state.session?.framework || settings.framework;
-    const mapping = options?.mapping || settings.customMapping;
-    const steps = state.recorder ? state.recorder.getSteps() : [];
-    if (!steps.length) return { ok: false, error: "No steps recorded yet" };
-    const traces = state.recorder.getTraces();
-    const code = generateCode(traces, { target, mapping });
-    if (state.session) persistCurrentSession({ generatedScript: code });
-    return { ok: true, code, framework: target };
+    try {
+      const settings = getSettings();
+      const target = options?.framework || state.session?.framework || settings.framework;
+      const mapping = options?.mapping || settings.customMapping;
+      const steps = state.recorder ? state.recorder.getSteps() : [];
+      if (!steps.length) return { ok: false, error: "No steps recorded yet" };
+      const traces = state.recorder.getTraces();
+      const code = generateCode(traces, { target, mapping });
+      if (state.session) persistCurrentSession({ generatedScript: code });
+      return { ok: true, code, framework: target };
+    } catch (err) {
+      console.error("[generate] failed:", err);
+      return { ok: false, error: String(err?.message || err) };
+    }
   });
 
   ipcMain.handle("script:save", async (_e, { code, framework }) => {

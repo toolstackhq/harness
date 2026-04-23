@@ -43,6 +43,16 @@ class DebuggerRecorder extends EventEmitter {
     this.paused = false;
   }
 
+  loadSteps(steps, info = {}) {
+    const targetId = info.targetId || "loaded";
+    const trace = { targetId, url: info.url || "", title: info.title || "", events: [] };
+    for (const event of steps || []) {
+      trace.events.push({ ...event, targetId });
+      this._counter += 1;
+    }
+    this.traces.set(targetId, trace);
+  }
+
   get stepCount() {
     let total = 0;
     for (const trace of this.traces.values()) total += trace.events.length;

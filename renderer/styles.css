@@ -758,11 +758,43 @@ a:hover { text-decoration: underline; }
 
 .journey-toolbar {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding: 10px 20px;
   border-bottom: 1px solid var(--grey-200);
   background: white;
 }
+.journey-toolbar__spacer { flex: 1; }
+.journey-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--grey-800);
+  margin-right: 12px;
+}
+.journey-opt input {
+  accent-color: var(--blue);
+  width: 16px; height: 16px;
+}
+.seg {
+  display: inline-flex;
+  border: 1px solid var(--grey-400);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.seg__btn {
+  background: white;
+  border: none;
+  padding: 0 12px;
+  height: 30px;
+  font: 500 12px/1 var(--font);
+  color: var(--grey-700);
+  cursor: pointer;
+}
+.seg__btn + .seg__btn { border-left: 1px solid var(--grey-300); }
+.seg__btn:hover { background: var(--grey-50); }
+.seg__btn--active { background: var(--blue-light); color: var(--blue-dark); }
 .journey-body {
   background: white;
   max-height: 55vh;

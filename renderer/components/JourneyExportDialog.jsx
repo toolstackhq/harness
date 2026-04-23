@@ -14,9 +14,11 @@ function describe(step) {
   return { action: step.kind, target: label };
 }
 
-export default function JourneyExportDialog({ steps, onClose }) {
+export default function JourneyExportDialog({ steps, onClose, defaultFormat = "html" }) {
   const [selected, setSelected] = useState(() => new Set(steps.map((_, i) => i)));
   const [busy, setBusy] = useState(false);
+  const [format, setFormat] = useState(defaultFormat);
+  const [callouts, setCallouts] = useState(true);
 
   useEffect(() => {
     setSelected(new Set(steps.map((_, i) => i)));
@@ -41,7 +43,7 @@ export default function JourneyExportDialog({ steps, onClose }) {
     setBusy(true);
     try {
       const indices = [...selected].sort((a, b) => a - b);
-      const result = await window.recrd.journey.export({ indices });
+      const result = await window.recrd.journey.export({ indices, format, callouts });
       if (result?.ok) onClose?.();
       else if (result && result.error) alert(result.error);
     } finally {
@@ -65,6 +67,21 @@ export default function JourneyExportDialog({ steps, onClose }) {
         <div className="journey-toolbar">
           <button className="btn btn--secondary" onClick={allOn}>Select all</button>
           <button className="btn btn--secondary" onClick={allOff}>Select none</button>
+          <div className="journey-toolbar__spacer" />
+          <label className="journey-opt">
+            <input type="checkbox" checked={callouts} onChange={(e) => setCallouts(e.target.checked)} />
+            Numbered callouts
+          </label>
+          <div className="seg">
+            <button
+              className={`seg__btn${format === "html" ? " seg__btn--active" : ""}`}
+              onClick={() => setFormat("html")}
+            >HTML</button>
+            <button
+              className={`seg__btn${format === "pdf" ? " seg__btn--active" : ""}`}
+              onClick={() => setFormat("pdf")}
+            >PDF</button>
+          </div>
         </div>
         <div className="dialog__body journey-body">
           {steps.length === 0 ? (
@@ -99,7 +116,7 @@ export default function JourneyExportDialog({ steps, onClose }) {
         <div className="dialog__footer">
           <button className="btn btn--secondary" onClick={onClose}>Cancel</button>
           <button className="btn btn--primary" onClick={doExport} disabled={busy || selected.size === 0}>
-            <Save size={16} /> {busy ? "Exporting…" : "Export HTML"}
+            <Save size={16} /> {busy ? "Exporting…" : `Export ${format.toUpperCase()}`}
           </button>
         </div>
       </div>

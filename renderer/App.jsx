@@ -39,15 +39,21 @@ export default function App() {
     return () => { offClosed(); offReplayLoaded(); };
   }, []);
 
-  const onStart = async ({ framework, url }) => {
+  const onStart = async ({ recordType, framework, url }) => {
     setBusy(true);
-    const result = await window.recrd.recorder.start({ framework, url });
+    const result = await window.recrd.recorder.start({ recordType, framework, url });
     setBusy(false);
     if (!result.ok) {
       alert(`Failed to start recording: ${result.error}`);
       return;
     }
-    setSession({ framework: result.framework, url: result.url, startedAt: Date.now(), stopped: false });
+    setSession({
+      framework: result.framework,
+      recordType: recordType || "script",
+      url: result.url,
+      startedAt: Date.now(),
+      stopped: false
+    });
     setInitialSteps([]);
     setSteps([]);
   };
@@ -58,6 +64,9 @@ export default function App() {
 
   const onGenerate = async () => {
     if (!session) return;
+    if (session.recordType === "doc") {
+      return onOpenJourney("pdf");
+    }
     const result = await window.recrd.script.generate({ framework: session.framework });
     if (!result.ok) {
       alert(result.error || "No steps yet.");
@@ -72,7 +81,7 @@ export default function App() {
     if (session) await window.recrd.browser.setVisible(true);
   };
 
-  const onOpenJourney = async () => {
+  const onOpenJourney = async (defaultFormat = "html") => {
     if (!session) return;
     const result = await window.recrd.journey.getSteps();
     if (!result?.ok) {
@@ -80,7 +89,7 @@ export default function App() {
       return;
     }
     await window.recrd.browser.setVisible(false);
-    setJourney({ steps: result.steps || [] });
+    setJourney({ steps: result.steps || [], defaultFormat });
   };
 
   const closeJourney = async () => {
@@ -118,12 +127,22 @@ export default function App() {
         section={session ? (session.stopped ? "Review" : "Recording") : "New session"}
         primary={
           session
-            ? { label: "Generate Script", icon: "code", onClick: onGenerate, disabled: steps.length === 0 }
+            ? {
+                label: session.recordType === "doc" ? "Generate PDF" : "Generate Script",
+                icon: session.recordType === "doc" ? "save" : "code",
+                onClick: onGenerate,
+                disabled: steps.length === 0
+              }
             : null
         }
         secondary={
           session
-            ? { label: "Export Journey", icon: "save", onClick: onOpenJourney, disabled: steps.length === 0 }
+            ? {
+                label: session.recordType === "doc" ? "Export HTML" : "Export Journey",
+                icon: "save",
+                onClick: () => onOpenJourney("html"),
+                disabled: steps.length === 0
+              }
             : null
         }
       />
@@ -155,6 +174,7 @@ export default function App() {
       {journey && (
         <JourneyExportDialog
           steps={journey.steps}
+          defaultFormat={journey.defaultFormat || "html"}
           onClose={closeJourney}
         />
       )}

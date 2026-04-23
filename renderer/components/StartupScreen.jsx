@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import FrameworkSelector from "./FrameworkSelector.jsx";
+import RecordTypeSelector from "./RecordTypeSelector.jsx";
 import { Play, Globe } from "./Icons.jsx";
 
 function Chip({ framework }) {
@@ -19,6 +20,7 @@ function formatAt(ts) {
 }
 
 export default function StartupScreen({ onStart, onOpenSession }) {
+  const [recordType, setRecordType] = useState("script");
   const [framework, setFramework] = useState("playwright");
   const [url, setUrl] = useState("https://example.com");
   const [mapping, setMapping] = useState("");
@@ -36,6 +38,7 @@ export default function StartupScreen({ onStart, onOpenSession }) {
     (async () => {
       const settings = await window.recrd.settings.get();
       if (!mounted) return;
+      setRecordType(settings.recordType || "script");
       setFramework(settings.framework || "playwright");
       setUrl(settings.lastUrl || "https://example.com");
       setMapping(JSON.stringify(settings.customMapping || {}, null, 2));
@@ -59,7 +62,7 @@ export default function StartupScreen({ onStart, onOpenSession }) {
 
   const onStartClick = async () => {
     let customMapping = undefined;
-    if (framework === "custom") {
+    if (recordType === "script" && framework === "custom") {
       const parsed = validateMapping();
       if (parsed === false) return;
       customMapping = parsed;
@@ -67,11 +70,12 @@ export default function StartupScreen({ onStart, onOpenSession }) {
     setLoading(true);
     try {
       await window.recrd.settings.set({
+        recordType,
         framework,
         lastUrl: url,
         ...(customMapping ? { customMapping } : {})
       });
-      await onStart({ framework, url });
+      await onStart({ recordType, framework, url });
     } finally {
       setLoading(false);
     }
@@ -98,10 +102,16 @@ export default function StartupScreen({ onStart, onOpenSession }) {
                 />
               </div>
               <div className="field">
-                <label className="field__label">Framework</label>
-                <FrameworkSelector value={framework} onChange={setFramework} />
+                <label className="field__label">Recording type</label>
+                <RecordTypeSelector value={recordType} onChange={setRecordType} />
               </div>
-              {framework === "custom" && (
+              {recordType === "script" && (
+                <div className="field">
+                  <label className="field__label">Framework</label>
+                  <FrameworkSelector value={framework} onChange={setFramework} />
+                </div>
+              )}
+              {recordType === "script" && framework === "custom" && (
                 <div className="field">
                   <label className="field__label">Custom action mapping (JSON)</label>
                   <textarea

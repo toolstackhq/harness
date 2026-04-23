@@ -67,6 +67,21 @@ class DebuggerRecorder extends EventEmitter {
     return null;
   }
 
+  attachLatestStepScreenshot(dataUrl) {
+    const traces = [...this.traces.values()];
+    for (let t = traces.length - 1; t >= 0; t -= 1) {
+      const events = traces[t].events;
+      for (let i = events.length - 1; i >= 0; i -= 1) {
+        const ev = events[i];
+        if (ev.kind !== "navigate" && !ev.screenshot) {
+          ev.screenshot = dataUrl;
+          return ev;
+        }
+      }
+    }
+    return null;
+  }
+
   get stepCount() {
     let total = 0;
     for (const trace of this.traces.values()) total += trace.events.length;

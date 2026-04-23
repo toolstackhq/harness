@@ -2,6 +2,7 @@
 
 const path = require("node:path");
 const fs = require("node:fs");
+const os = require("node:os");
 const crypto = require("node:crypto");
 const { app, BrowserWindow, WebContentsView, ipcMain, shell, dialog, clipboard, Menu, nativeImage } = require("electron");
 const { DebuggerRecorder } = require("./recorder/recorder.js");
@@ -49,6 +50,7 @@ function writeJson(file, value) {
 
 function getSettings() {
   const defaults = {
+    recordType: "script",
     framework: "playwright",
     customMapping: {
       navigate: "await this.goTo('{url}')",
@@ -208,6 +210,31 @@ function createBrowserView(initialUrl) {
   return view;
 }
 
+let stepShotBusy = false;
+let stepShotPending = false;
+async function scheduleStepCapture() {
+  if (!state.recorder || !state.browserView) return;
+  if (stepShotBusy) { stepShotPending = true; return; }
+  stepShotBusy = true;
+  await new Promise((r) => setTimeout(r, 350));
+  try {
+    const image = await state.browserView.webContents.capturePage();
+    if (!image.isEmpty()) {
+      const dataUrl = image.resize({ width: 800 }).toDataURL();
+      const updated = state.recorder.attachLatestStepScreenshot(dataUrl);
+      if (updated) emitToRenderer("step:screenshot", { dataUrl });
+    }
+  } catch (err) {
+    console.warn("scheduleStepCapture failed:", err?.message || err);
+  } finally {
+    stepShotBusy = false;
+    if (stepShotPending) {
+      stepShotPending = false;
+      scheduleStepCapture();
+    }
+  }
+}
+
 function emitToRenderer(channel, payload) {
   if (!state.mainWindow || state.mainWindow.isDestroyed()) return;
   state.mainWindow.webContents.send(channel, payload);
@@ -216,18 +243,25 @@ function emitToRenderer(channel, payload) {
 async function startRecording(options) {
   const settings = getSettings();
   const url = options?.url || settings.lastUrl || "about:blank";
-  setSettings({ lastUrl: url, framework: options?.framework || settings.framework });
+  const recordType = options?.recordType || settings.recordType || "script";
+  setSettings({
+    lastUrl: url,
+    framework: options?.framework || settings.framework,
+    recordType
+  });
   createBrowserView(url);
   const recorder = new DebuggerRecorder(state.browserView.webContents, {
     captureSensitive: Boolean(options?.captureSensitive ?? settings.captureSensitive),
     target: options?.framework || settings.framework,
-    customMapping: settings.customMapping
+    customMapping: settings.customMapping,
+    recordType
   });
   state.recorder = recorder;
   state.session = {
     id: newId(),
     startedAt: Date.now(),
     framework: options?.framework || settings.framework,
+    recordType,
     url,
     recording: true,
     stopped: false,
@@ -240,6 +274,9 @@ async function startRecording(options) {
       shadowCount: recorder.shadowCount,
       warningCount: recorder.warningCount
     });
+    if (recordType === "doc" && step.kind !== "navigate") {
+      scheduleStepCapture();
+    }
   });
   recorder.on("cleared", () => emitToRenderer("recorder:cleared", {}));
   recorder.on("error", (err) => emitToRenderer("recorder:error", { message: String(err?.message || err) }));
@@ -264,6 +301,7 @@ function persistCurrentSession({ generatedScript } = {}) {
     timestamp: state.session.startedAt || Date.now(),
     url: state.session.url,
     framework: state.session.framework,
+    recordType: state.session.recordType || "script",
     stepCount: steps.length,
     steps,
     generatedScript: generatedScript ?? null
@@ -520,7 +558,7 @@ function registerIpc() {
     return { ok: true, steps: state.recorder.getSteps(), session: state.session };
   });
 
-  ipcMain.handle("journey:export", async (_e, { indices, title }) => {
+  ipcMain.handle("journey:export", async (_e, { indices, title, format, callouts }) => {
     if (!state.recorder) return { ok: false, error: "No active session" };
     const all = state.recorder.getSteps();
     const selection = Array.isArray(indices) ? indices : all.map((_, i) => i);
@@ -532,24 +570,66 @@ function registerIpc() {
       url: state.session?.url || "",
       framework: state.session?.framework || "",
       startedAt: state.session?.startedAt || Date.now(),
-      title: title || state.session?.url || "User journey"
+      title: title || state.session?.url || "User journey",
+      callouts: callouts !== false
     };
     const html = renderJourneyHtml(steps, meta);
     const stamp = new Date(meta.startedAt).toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const defaultPath = `journey-${stamp}.html`;
-    const result = await dialog.showSaveDialog(state.mainWindow, {
-      title: "Export user journey",
-      defaultPath,
-      filters: [{ name: "HTML", extensions: ["html", "htm"] }]
+    const fmt = format === "pdf" ? "pdf" : "html";
+    const ext = fmt;
+    const filter = fmt === "pdf"
+      ? { name: "PDF", extensions: ["pdf"] }
+      : { name: "HTML", extensions: ["html", "htm"] };
+    const saveResult = await dialog.showSaveDialog(state.mainWindow, {
+      title: fmt === "pdf" ? "Export walkthrough PDF" : "Export user journey",
+      defaultPath: `journey-${stamp}.${ext}`,
+      filters: [filter]
     });
-    if (result.canceled || !result.filePath) return { ok: false };
-    fs.writeFileSync(result.filePath, html, "utf8");
-    return { ok: true, path: result.filePath };
+    if (saveResult.canceled || !saveResult.filePath) return { ok: false };
+    if (fmt === "html") {
+      fs.writeFileSync(saveResult.filePath, html, "utf8");
+      return { ok: true, path: saveResult.filePath };
+    }
+    try {
+      const buffer = await renderHtmlToPdf(html);
+      fs.writeFileSync(saveResult.filePath, buffer);
+      return { ok: true, path: saveResult.filePath };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
   });
 
   ipcMain.handle("shell:open-external", (_e, url) => {
     try { shell.openExternal(url); return { ok: true }; } catch (err) { return { ok: false, error: String(err) }; }
   });
+}
+
+async function renderHtmlToPdf(html) {
+  const tmp = path.join(os.tmpdir(), `recrd-walkthrough-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.html`);
+  fs.writeFileSync(tmp, html, "utf8");
+  const pdfWin = new BrowserWindow({
+    show: false,
+    width: 1000,
+    height: 1200,
+    webPreferences: {
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false
+    }
+  });
+  try {
+    await pdfWin.loadFile(tmp);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    const buffer = await pdfWin.webContents.printToPDF({
+      pageSize: "A4",
+      printBackground: true,
+      margins: { top: 0.4, bottom: 0.4, left: 0.4, right: 0.4 }
+    });
+    return buffer;
+  } finally {
+    try { pdfWin.destroy(); } catch (_) {}
+    try { fs.unlinkSync(tmp); } catch (_) {}
+  }
 }
 
 function escapeHtml(value) {
@@ -577,6 +657,7 @@ function describeStep(step) {
 function renderJourneyHtml(selection, meta) {
   const when = new Date(meta.startedAt).toLocaleString();
   const title = escapeHtml(meta.title);
+  const callouts = meta.callouts !== false;
   const rows = selection.map(({ index, step }, i) => {
     const loc = step.locator || {};
     const chain = Array.isArray(loc.shadowChain) && loc.shadowChain.length
@@ -584,9 +665,23 @@ function renderJourneyHtml(selection, meta) {
       : "";
     const selector = step.kind === "navigate" ? "" : (loc.css || loc.xpath || "");
     const d = describeStep(step);
-    const screenshot = step.screenshot
-      ? `<img class="shot" src="${step.screenshot}" alt="Screenshot for step ${index + 1}" />`
-      : "";
+    const num = String(i + 1).padStart(2, "0");
+
+    let screenshotBlock = "";
+    if (step.screenshot) {
+      const rect = loc.rect;
+      const viewport = loc.viewport;
+      let overlay = "";
+      if (step.kind !== "navigate" && rect && viewport && viewport.width && viewport.height) {
+        const left = Math.max(0, (rect.x / viewport.width) * 100);
+        const top = Math.max(0, (rect.y / viewport.height) * 100);
+        const width = Math.max(1, (rect.width / viewport.width) * 100);
+        const height = Math.max(1, (rect.height / viewport.height) * 100);
+        overlay = `<div class="bbox" style="left:${left.toFixed(2)}%;top:${top.toFixed(2)}%;width:${width.toFixed(2)}%;height:${height.toFixed(2)}%;">${callouts ? `<span class="callout">${num}</span>` : ""}</div>`;
+      }
+      screenshotBlock = `<figure class="shot"><img src="${step.screenshot}" alt="Screenshot for step ${num}" />${overlay}</figure>`;
+    }
+
     const valueBlock = d.value !== undefined
       ? `<div class="row"><span class="k">Value</span><code class="v">${escapeHtml(JSON.stringify(d.value))}</code></div>`
       : "";
@@ -596,13 +691,13 @@ function renderJourneyHtml(selection, meta) {
     const targetBlock = `<div class="row"><span class="k">Target</span><span class="v">${escapeHtml(d.target)}</span></div>`;
     return `
       <section class="step">
-        <div class="num">${String(i + 1).padStart(2, "0")}</div>
+        <div class="num">${num}</div>
         <div class="body">
           <div class="headline">${escapeHtml(d.action)}</div>
           ${targetBlock}
           ${selectorBlock}
           ${valueBlock}
-          ${screenshot}
+          ${screenshotBlock}
         </div>
       </section>`;
   }).join("\n");
@@ -657,9 +752,37 @@ function renderJourneyHtml(selection, meta) {
     .v { font-size: 13px; color: var(--grey-800); word-break: break-word; min-width: 0; }
     code.v { font-family: 'Roboto Mono', monospace; font-size: 12px; background: var(--grey-100); padding: 2px 6px; border-radius: 3px; }
     .chain { color: var(--teal); }
-    .shot {
-      display: block; margin-top: 12px; max-width: 100%;
+    figure.shot {
+      position: relative;
+      margin: 12px 0 0; max-width: 800px;
+    }
+    figure.shot img {
+      display: block; width: 100%;
       border: 1px solid var(--grey-300); border-radius: 4px;
+    }
+    .bbox {
+      position: absolute;
+      border: 2px dashed var(--blue);
+      background: rgba(26,115,232,0.12);
+      box-shadow: 0 0 0 2px rgba(26,115,232,0.15);
+      border-radius: 3px;
+      pointer-events: none;
+    }
+    .callout {
+      position: absolute;
+      left: -10px; top: -10px;
+      min-width: 22px; height: 22px;
+      padding: 0 6px;
+      border-radius: 11px;
+      background: var(--blue); color: white;
+      font: 600 11px/22px 'Roboto Mono',monospace;
+      text-align: center;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+    @media print {
+      body { background: white; padding: 0; }
+      header, .step { page-break-inside: avoid; break-inside: avoid; }
+      .step { box-shadow: none; }
     }
   </style>
 </head>

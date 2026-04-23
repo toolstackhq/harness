@@ -166,6 +166,16 @@ function createRecorderScript(options = {}) {
       const css = buildCss(el);
       const chain = shadowChain(el);
       const matched = ambiguityCount(el, css);
+      let rect = null;
+      try {
+        const r = el.getBoundingClientRect && el.getBoundingClientRect();
+        if (r) rect = { x: r.left, y: r.top, width: r.width, height: r.height };
+      } catch (_) {}
+      const viewport = {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio || 1
+      };
       return {
         tag,
         type,
@@ -185,7 +195,9 @@ function createRecorderScript(options = {}) {
         css,
         xpath: buildXpath(el),
         shadowChain: chain,
-        matchedCount: matched
+        matchedCount: matched,
+        rect,
+        viewport
       };
     };
 

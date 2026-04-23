@@ -437,6 +437,33 @@ function registerIpc() {
     scheduleStepCapture();
     return { ok: true };
   });
+  ipcMain.handle("recorder:delete-step", (_e, number) => {
+    if (!state.recorder) return { ok: false, error: "No active session" };
+    const removed = state.recorder.deleteStepByNumber(number);
+    const steps = state.recorder.getSteps();
+    emitToRenderer("steps:changed", { steps });
+    return { ok: removed, steps };
+  });
+  ipcMain.handle("recorder:update-step", (_e, { number, patch }) => {
+    if (!state.recorder) return { ok: false, error: "No active session" };
+    const updated = state.recorder.updateStepByNumber(number, patch || {});
+    if (!updated) return { ok: false, error: "Step not found" };
+    const steps = state.recorder.getSteps();
+    emitToRenderer("steps:changed", { steps });
+    return { ok: true, steps, step: updated };
+  });
+  ipcMain.handle("recorder:add-assertion", (_e, payload) => {
+    if (!state.recorder || !state.session) return { ok: false, error: "No active session" };
+    const { selector, assertionType, expected } = payload || {};
+    if (!selector || !String(selector).trim()) return { ok: false, error: "Selector required" };
+    state.recorder.addAssertion({
+      selector: String(selector).trim(),
+      assertionType: assertionType || "visible",
+      expected: expected ?? ""
+    });
+    const steps = state.recorder.getSteps();
+    return { ok: true, steps };
+  });
   ipcMain.handle("recorder:state", () => {
     if (!state.recorder) return { recording: false };
     return {
@@ -654,6 +681,19 @@ function describeStep(step) {
   const loc = step.locator || {};
   const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
   if (step.kind === "note") return { action: "Note", target: step.text || "" };
+  if (step.kind === "assert") {
+    const t = step.assertionType || "visible";
+    const sel = loc.css || loc.xpath || label;
+    const exp = step.expected ?? "";
+    const phrase = {
+      visible: "is visible",
+      hidden: "is hidden",
+      text: `has text "${exp}"`,
+      contains: `contains "${exp}"`,
+      value: `has value "${exp}"`
+    }[t] || t;
+    return { action: `Expect ${sel} ${phrase}`, target: sel };
+  }
   if (step.kind === "navigate") return { action: "Navigate", target: step.url || "" };
   if (step.kind === "fill") return { action: "Fill", target: label, value: step.value ?? "" };
   if (step.kind === "check") return { action: step.checked ? "Check" : "Uncheck", target: label };
@@ -682,6 +722,19 @@ function renderJourneyHtml(selection, meta) {
           <div class="headline">📝 Note</div>
           <div class="note-text">${textHtml}</div>
           ${shot}
+        </div>
+      </section>`;
+    }
+    if (step.kind === "assert") {
+      const d = describeStep(step);
+      const loc2 = step.locator || {};
+      const sel2 = loc2.css || loc2.xpath || "";
+      return `
+      <section class="step step--assert">
+        <div class="num">${num}</div>
+        <div class="body">
+          <div class="headline">✓ ${escapeHtml(d.action)}</div>
+          <div class="row"><span class="k">Selector</span><code class="v">${escapeHtml(sel2)}</code></div>
         </div>
       </section>`;
     }
@@ -809,6 +862,11 @@ function renderJourneyHtml(selection, meta) {
       border-color: var(--orange);
     }
     .step--note .headline { color: var(--orange); }
+    .step--assert {
+      background: var(--green-bg);
+      border-color: var(--green);
+    }
+    .step--assert .headline { color: var(--green); }
     .step--note .note-text {
       font-size: 14px;
       color: var(--grey-900);

@@ -47,8 +47,10 @@ class DebuggerRecorder extends EventEmitter {
     const targetId = info.targetId || "loaded";
     const trace = { targetId, url: info.url || "", title: info.title || "", events: [] };
     for (const event of steps || []) {
-      trace.events.push({ ...event, targetId });
       this._counter += 1;
+      const number = event.number || this._counter;
+      if (number > this._counter) this._counter = number;
+      trace.events.push({ ...event, targetId, number });
     }
     this.traces.set(targetId, trace);
   }
@@ -388,7 +390,66 @@ class DebuggerRecorder extends EventEmitter {
 
   _emitStep(event) {
     this._counter += 1;
-    this.emit("step", { ...event, number: this._counter });
+    event.number = this._counter;
+    this.emit("step", event);
+  }
+
+  deleteStepByNumber(number) {
+    for (const trace of this.traces.values()) {
+      const idx = trace.events.findIndex((e) => e.number === number);
+      if (idx !== -1) {
+        trace.events.splice(idx, 1);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  updateStepByNumber(number, patch = {}) {
+    for (const trace of this.traces.values()) {
+      const idx = trace.events.findIndex((e) => e.number === number);
+      if (idx === -1) continue;
+      const event = trace.events[idx];
+      if (patch.value !== undefined) event.value = patch.value;
+      if (patch.text !== undefined) event.text = patch.text;
+      if (patch.expected !== undefined) event.expected = patch.expected;
+      if (patch.selector !== undefined) {
+        event.locator = event.locator || {};
+        event.locator.css = patch.selector;
+        event.locator.shadowChain = [];
+        event.locator.quality = "manual";
+        event.locator.reason = "manual-override";
+        event.locator.ambiguous = false;
+      }
+      return event;
+    }
+    return null;
+  }
+
+  addAssertion({ selector, assertionType, expected, ts, number: existingNumber }) {
+    const targetId = this.traces.size > 0 ? [...this.traces.keys()].pop() : "root";
+    const trace = this._ensureTrace(targetId, {});
+    const event = {
+      kind: "assert",
+      ts: Number(ts) || now(),
+      targetId,
+      assertionType: assertionType || "visible",
+      expected: expected ?? "",
+      locator: {
+        css: String(selector || ""),
+        shadowChain: [],
+        quality: "manual",
+        reason: "assertion"
+      }
+    };
+    trace.events.push(event);
+    if (existingNumber) {
+      event.number = existingNumber;
+      this.emit("step", event);
+    } else {
+      this._emitStep(event);
+    }
+    return event;
   }
 }
 

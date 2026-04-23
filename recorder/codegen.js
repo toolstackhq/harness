@@ -55,7 +55,23 @@ function normalizeTrace(input) {
           ts: Number(event.ts ?? Date.now()),
           targetId: event.targetId ?? trace.targetId ?? "",
           url: String(event.url ?? trace.url ?? "").trim(),
-          screenshot: event.screenshot
+          screenshot: event.screenshot,
+          number: event.number
+        });
+        continue;
+      }
+      if (event.kind === "assert") {
+        const selector = String(event.locator?.css ?? event.selector ?? "").trim();
+        if (!selector) continue;
+        normalized.push({
+          kind: "assert",
+          assertionType: event.assertionType || "visible",
+          expected: event.expected ?? "",
+          locator: event.locator || { css: selector, shadowChain: [] },
+          ts: Number(event.ts ?? Date.now()),
+          targetId: event.targetId ?? trace.targetId ?? "",
+          screenshot: event.screenshot,
+          number: event.number
         });
         continue;
       }
@@ -191,9 +207,26 @@ function commentLines(text, indent = "    ") {
   return String(text || "").split("\n").map((line) => `${indent}// ${line}`).join("\n");
 }
 
+function renderPlaywrightAssertion(step) {
+  const loc = step.locator || {};
+  const base = renderPlaywrightLocator(loc);
+  const expected = step.expected ?? "";
+  switch (step.assertionType) {
+    case "hidden": return `    await expect(${base}).toBeHidden();`;
+    case "text": return `    await expect(${base}).toHaveText(${escapeString(expected)});`;
+    case "contains": return `    await expect(${base}).toContainText(${escapeString(expected)});`;
+    case "value": return `    await expect(${base}).toHaveValue(${escapeString(expected)});`;
+    case "visible":
+    default: return `    await expect(${base}).toBeVisible();`;
+  }
+}
+
 function renderPlaywright(trace) {
+  const hasAsserts = trace.events.some((s) => s.kind === "assert");
   const lines = [
-    `import { chromium } from "playwright";`,
+    hasAsserts
+      ? `import { chromium, expect } from "@playwright/test";`
+      : `import { chromium } from "playwright";`,
     "",
     "(async () => {",
     "  const browser = await chromium.launch({ headless: false });",
@@ -203,6 +236,10 @@ function renderPlaywright(trace) {
   for (const step of trace.events) {
     if (step.kind === "note") {
       lines.push(commentLines(step.text));
+      continue;
+    }
+    if (step.kind === "assert") {
+      lines.push(renderPlaywrightAssertion(step));
       continue;
     }
     if (step.kind === "navigate") {
@@ -222,11 +259,29 @@ function renderPlaywright(trace) {
   return lines.join("\n");
 }
 
+function renderCypressAssertion(step) {
+  const loc = step.locator || {};
+  const base = renderCypressLocator(loc);
+  const expected = step.expected ?? "";
+  switch (step.assertionType) {
+    case "hidden": return `    ${base}.should('not.be.visible');`;
+    case "text": return `    ${base}.should('have.text', ${escapeString(expected)});`;
+    case "contains": return `    ${base}.should('contain', ${escapeString(expected)});`;
+    case "value": return `    ${base}.should('have.value', ${escapeString(expected)});`;
+    case "visible":
+    default: return `    ${base}.should('be.visible');`;
+  }
+}
+
 function renderCypress(trace) {
   const lines = [`describe(${escapeString(trace.title || "recorded flow")}, () => {`, `  it('replays the flow', () => {`];
   for (const step of trace.events) {
     if (step.kind === "note") {
       lines.push(commentLines(step.text));
+      continue;
+    }
+    if (step.kind === "assert") {
+      lines.push(renderCypressAssertion(step));
       continue;
     }
     if (step.kind === "navigate") {
@@ -246,6 +301,23 @@ function renderCypress(trace) {
   return lines.join("\n");
 }
 
+function renderSeleniumAssertion(step) {
+  const loc = step.locator || {};
+  const sel = renderSeleniumLocator(loc);
+  const ref = sel.kind === "shadowJs"
+    ? `(async () => { const el = await driver.executeScript(${escapeString(sel.script)}); return el; })()`
+    : `driver.findElement(${sel.expr})`;
+  const expected = JSON.stringify(String(step.expected ?? ""));
+  switch (step.assertionType) {
+    case "hidden": return `    { const el = await ${ref}; if (await el.isDisplayed()) throw new Error('Expected hidden'); }`;
+    case "text": return `    { const el = await ${ref}; if ((await el.getText()).trim() !== ${expected}) throw new Error('Text mismatch'); }`;
+    case "contains": return `    { const el = await ${ref}; if (!(await el.getText()).includes(${expected})) throw new Error('Text does not contain'); }`;
+    case "value": return `    { const el = await ${ref}; if ((await el.getAttribute('value')) !== ${expected}) throw new Error('Value mismatch'); }`;
+    case "visible":
+    default: return `    { const el = await ${ref}; if (!(await el.isDisplayed())) throw new Error('Expected visible'); }`;
+  }
+}
+
 function renderSelenium(trace) {
   const lines = [
     'import { Builder, By, Key } from "selenium-webdriver";',
@@ -257,6 +329,10 @@ function renderSelenium(trace) {
   for (const step of trace.events) {
     if (step.kind === "note") {
       lines.push(commentLines(step.text));
+      continue;
+    }
+    if (step.kind === "assert") {
+      lines.push(renderSeleniumAssertion(step));
       continue;
     }
     if (step.kind === "navigate") {
@@ -298,7 +374,12 @@ const DEFAULT_CUSTOM_MAPPING = {
   check: "await this.setChecked('{selector}', {checked})",
   press: "await this.press('{selector}', '{key}')",
   submit: "await this.submit('{selector}')",
-  note: "// {text}"
+  note: "// {text}",
+  assertVisible: "await this.expectVisible('{selector}')",
+  assertHidden: "await this.expectHidden('{selector}')",
+  assertText: "await this.expectText('{selector}', '{expected}')",
+  assertContains: "await this.expectContains('{selector}', '{expected}')",
+  assertValue: "await this.expectValue('{selector}', '{expected}')"
 };
 
 function renderCustom(trace, options = {}) {
@@ -314,6 +395,19 @@ function renderCustom(trace, options = {}) {
       } else {
         lines.push(interpolate(tpl, { ...customBindings(step), text }));
       }
+      continue;
+    }
+    if (step.kind === "assert") {
+      const key = step.assertionType === "hidden" ? "assertHidden"
+        : step.assertionType === "text" ? "assertText"
+        : step.assertionType === "contains" ? "assertContains"
+        : step.assertionType === "value" ? "assertValue"
+        : "assertVisible";
+      const tpl = mapping[key];
+      if (!tpl) continue;
+      const expected = String(step.expected ?? "");
+      const bindings = { ...customBindings(step), expected };
+      lines.push(interpolate(tpl, bindings) + ";");
       continue;
     }
     const template = mapping[step.kind];

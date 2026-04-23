@@ -5,6 +5,7 @@ import StartupScreen from "./components/StartupScreen.jsx";
 import RecordingScreen from "./components/RecordingScreen.jsx";
 import ScriptDialog from "./components/ScriptDialog.jsx";
 import SessionDetailModal from "./components/SessionDetailModal.jsx";
+import JourneyExportDialog from "./components/JourneyExportDialog.jsx";
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -13,6 +14,7 @@ export default function App() {
   const [steps, setSteps] = useState([]);
   const [dialog, setDialog] = useState(null);
   const [detail, setDetail] = useState(null);
+  const [journey, setJourney] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -70,6 +72,22 @@ export default function App() {
     if (session) await window.recrd.browser.setVisible(true);
   };
 
+  const onOpenJourney = async () => {
+    if (!session) return;
+    const result = await window.recrd.journey.getSteps();
+    if (!result?.ok) {
+      alert(result?.error || "No steps available.");
+      return;
+    }
+    await window.recrd.browser.setVisible(false);
+    setJourney({ steps: result.steps || [] });
+  };
+
+  const closeJourney = async () => {
+    setJourney(null);
+    if (session) await window.recrd.browser.setVisible(true);
+  };
+
   const onReplaySession = async (sessionEntry) => {
     setDetail(null);
     setBusy(true);
@@ -103,6 +121,11 @@ export default function App() {
             ? { label: "Generate Script", icon: "code", onClick: onGenerate, disabled: steps.length === 0 }
             : null
         }
+        secondary={
+          session
+            ? { label: "Export Journey", icon: "save", onClick: onOpenJourney, disabled: steps.length === 0 }
+            : null
+        }
       />
       <Breadcrumb items={breadcrumb} />
       {session ? (
@@ -127,6 +150,12 @@ export default function App() {
           onClose={closeDialog}
           onCopy={() => window.recrd.script.copy(dialog.code)}
           onSave={() => window.recrd.script.save({ code: dialog.code, framework: dialog.framework })}
+        />
+      )}
+      {journey && (
+        <JourneyExportDialog
+          steps={journey.steps}
+          onClose={closeJourney}
         />
       )}
       {detail && (

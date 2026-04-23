@@ -755,3 +755,69 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: 12px;
 }
+
+.journey-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--grey-200);
+  background: white;
+}
+.journey-body {
+  background: white;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.journey-row {
+  display: grid;
+  grid-template-columns: 24px 28px 24px 1fr;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--grey-100);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.journey-row:hover { background: var(--grey-50); }
+.journey-row--off { opacity: 0.5; }
+.journey-row input[type="checkbox"] {
+  margin: 4px 0 0;
+  accent-color: var(--blue);
+  width: 16px;
+  height: 16px;
+}
+.journey-row__num {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--grey-600);
+  padding-top: 6px;
+  text-align: right;
+}
+.journey-row__icon {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--grey-100);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--grey-700);
+}
+.journey-row__body { min-width: 0; }
+.journey-row__action {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--grey-900);
+  display: flex; align-items: center; gap: 8px;
+}
+.journey-row__target {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--grey-600);
+  margin-top: 3px;
+  word-break: break-all;
+}
+.journey-row__shot-chip {
+  font: 500 10px/1 var(--font);
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: var(--teal-bg);
+  color: var(--teal);
+  border: 1px solid var(--teal);
+}

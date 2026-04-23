@@ -19,6 +19,39 @@ Artifacts persist under `~/.config/recrd/`:
 - `recrd-settings.json` — framework + custom mapping + last URL
 - `recrd-sessions.json` — up to 20 saved sessions with steps + generated script
 
+## Corporate networks / offline installs
+
+`npm install` downloads the Electron Chromium binary from
+`github.com/electron/electron/releases`. On networks that block GitHub
+or require egress through an internal mirror, set one of the env vars
+below before `npm install`. `.npmrc.example` is checked in as a
+template; copy it to `.npmrc` (which is git-ignored) and edit.
+
+| Env var / npm key                 | What it does |
+|-----------------------------------|--------------|
+| `ELECTRON_MIRROR` / `electron_mirror` | Base URL of an internal Electron release mirror (Artifactory / Nexus / S3). Must end with `/`. |
+| `ELECTRON_CUSTOM_DIR` / `electron_custom_dir` | Path template under the mirror. Default `{{ version }}`. |
+| `ELECTRON_CACHE` | Reuse a pre-populated download cache (e.g. a shared fileshare). |
+| `ELECTRON_SKIP_BINARY_DOWNLOAD=1` | Skip the Chromium download entirely — use when IT pre-stages the binary under `node_modules/electron/dist/`. |
+
+Quick examples:
+
+```bash
+# Internal Artifactory mirror
+ELECTRON_MIRROR=https://artifactory.company.local/electron/ npm install
+
+# Pre-staged binary, skip download
+ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install
+
+# Shared offline cache
+ELECTRON_CACHE=/shared/npm/electron npm install
+```
+
+Once installed, no further network access is needed — the app runs
+entirely against the embedded Chromium. The embedded browser *does*
+hit the internet to load whatever URL you record against; that
+traffic flows through the normal system proxy settings.
+
 ---
 
 # Requirements Traceability

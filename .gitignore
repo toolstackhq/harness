@@ -4,6 +4,7 @@ renderer-dist/
 .DS_Store
 .env
 .env.*
+.npmrc
 i.png
 2.png
 .codex

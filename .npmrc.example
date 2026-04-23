@@ -1,0 +1,20 @@
+# Copy to .npmrc and uncomment/edit whichever applies to your environment.
+# .npmrc is git-ignored so your local values stay out of version control.
+
+# --- Corporate mirror for Electron downloads ---
+# If your IT team hosts Electron releases on an internal mirror (Artifactory,
+# Nexus, etc.) point ELECTRON_MIRROR at it. URL must end with a trailing slash.
+# The installer substitutes {{ version }} and {{ file }} from the manifest.
+# electron_mirror=https://artifactory.company.local/electron/
+# electron_custom_dir={{ version }}
+
+# --- Skip the Chromium download entirely ---
+# Useful on air-gapped machines. After install, manually place the extracted
+# Electron binary under node_modules/electron/dist/ so ./node_modules/.bin/electron
+# still resolves.
+# electron_skip_binary_download=1
+
+# --- Offline cache ---
+# If you already downloaded the Electron zip on another machine, point
+# ELECTRON_CACHE at that directory (npm will not re-fetch).
+# cache=/shared/npm-cache

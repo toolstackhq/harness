@@ -9,6 +9,9 @@ export default function RecordingScreen({
   autoReplay,
   onNewSession,
   onAddNote,
+  onAddAssertion,
+  onEditStep,
+  onDeleteStep,
   onStepsChange
 }) {
   const [url, setUrl] = useState(session.url);
@@ -68,7 +71,10 @@ export default function RecordingScreen({
     const offStopped = window.recrd.recorder.onStopped(() => {
       setRecording(false);
     });
-    return () => { offStep(); offCleared(); offUrl(); offStopped(); };
+    const offChanged = window.recrd.recorder.onStepsChanged(({ steps: fresh }) => {
+      if (Array.isArray(fresh)) setSteps(fresh);
+    });
+    return () => { offStep(); offCleared(); offUrl(); offStopped(); offChanged(); };
   }, []);
 
   useEffect(() => {
@@ -140,6 +146,8 @@ export default function RecordingScreen({
         onNewSession={onNewSession}
         canAddNote={true}
         onAddNote={onAddNote}
+        canAddAssertion={session.recordType !== "doc"}
+        onAddAssertion={onAddAssertion}
       />
       <InfoBar
         cdp={recording}
@@ -161,6 +169,9 @@ export default function RecordingScreen({
           onClear={onClear}
           onStop={onStop}
           onReplay={onReplay}
+          canEditSteps
+          onEditStep={onEditStep}
+          onDeleteStep={onDeleteStep}
         />
       </div>
     </div>

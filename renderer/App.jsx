@@ -7,6 +7,8 @@ import ScriptDialog from "./components/ScriptDialog.jsx";
 import SessionDetailModal from "./components/SessionDetailModal.jsx";
 import JourneyExportDialog from "./components/JourneyExportDialog.jsx";
 import NoteComposer from "./components/NoteComposer.jsx";
+import StepEditDialog from "./components/StepEditDialog.jsx";
+import AssertionDialog from "./components/AssertionDialog.jsx";
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -17,6 +19,8 @@ export default function App() {
   const [detail, setDetail] = useState(null);
   const [journey, setJourney] = useState(null);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [assertOpen, setAssertOpen] = useState(false);
+  const [editingStep, setEditingStep] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -77,12 +81,58 @@ export default function App() {
     return true;
   };
 
+  const onAddAssertion = () => {
+    if (!session) return;
+    setAssertOpen(true);
+  };
+  const saveAssertion = async (payload) => {
+    const result = await window.recrd.recorder.addAssertion(payload);
+    if (!result?.ok) {
+      alert(result?.error || "Failed to add assertion.");
+      return false;
+    }
+    return true;
+  };
+
+  const onEditStep = (step) => setEditingStep(step);
+  const saveStepEdit = async (patch) => {
+    if (!editingStep) return false;
+    if (Object.keys(patch).length === 0) return true;
+    const result = await window.recrd.recorder.updateStep(editingStep.number, patch);
+    if (!result?.ok) {
+      alert(result?.error || "Failed to update step.");
+      return false;
+    }
+    return true;
+  };
+  const onDeleteStep = async (step) => {
+    if (!step?.number) return;
+    const confirmed = window.confirm(`Delete step ${String(step.number).padStart(2, "0")}?`);
+    if (!confirmed) return;
+    await window.recrd.recorder.deleteStep(step.number);
+  };
+
+  const lastInteractiveSelector = (() => {
+    for (let i = steps.length - 1; i >= 0; i -= 1) {
+      const s = steps[i];
+      if (s?.kind && s.kind !== "navigate" && s.kind !== "note" && s.kind !== "assert") {
+        const loc = s.locator || {};
+        return loc.css || loc.xpath || "";
+      }
+    }
+    return "";
+  })();
+
   useEffect(() => {
     const onKey = (e) => {
+      if (!session) return;
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "N" || e.key === "n")) {
-        if (session) {
+        e.preventDefault();
+        setNoteOpen(true);
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "A" || e.key === "a")) {
+        if (session.recordType !== "doc") {
           e.preventDefault();
-          setNoteOpen(true);
+          setAssertOpen(true);
         }
       }
     };
@@ -195,6 +245,9 @@ export default function App() {
           autoReplay={autoReplay}
           onNewSession={onNewSession}
           onAddNote={onAddNote}
+          onAddAssertion={onAddAssertion}
+          onEditStep={onEditStep}
+          onDeleteStep={onDeleteStep}
           onStepsChange={setSteps}
         />
       ) : (
@@ -223,6 +276,20 @@ export default function App() {
         <NoteComposer
           onSave={saveNote}
           onClose={() => setNoteOpen(false)}
+        />
+      )}
+      {assertOpen && (
+        <AssertionDialog
+          defaultSelector={lastInteractiveSelector}
+          onSave={saveAssertion}
+          onClose={() => setAssertOpen(false)}
+        />
+      )}
+      {editingStep && (
+        <StepEditDialog
+          step={editingStep}
+          onSave={saveStepEdit}
+          onClose={() => setEditingStep(null)}
         />
       )}
       {detail && (

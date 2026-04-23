@@ -1,10 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
-import { actionIcon, Check, Close, Spinner, Play } from "./Icons.jsx";
+import { actionIcon, Check, Close, Spinner, Play, More, Edit, Trash } from "./Icons.jsx";
 
 function describe(step) {
   const loc = step.locator || {};
   const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
   if (step.kind === "note") return { action: "note", target: (step.text || "").split("\n")[0] };
+  if (step.kind === "assert") {
+    const sel = loc.css || loc.xpath || "";
+    const t = step.assertionType || "visible";
+    const phrase = { visible: "visible", hidden: "hidden", text: `text = ${JSON.stringify(step.expected || "")}`, contains: `contains ${JSON.stringify(step.expected || "")}`, value: `value = ${JSON.stringify(step.expected || "")}` }[t] || t;
+    return { action: `assert ${phrase}`, target: sel };
+  }
   if (step.kind === "navigate") return { action: "navigate", target: step.url || "" };
   if (step.kind === "fill") return { action: "fill", target: `${label} = ${JSON.stringify(step.value ?? "")}` };
   if (step.kind === "check") return { action: step.checked ? "check" : "uncheck", target: label };
@@ -14,8 +20,9 @@ function describe(step) {
   return { action: step.kind, target: label };
 }
 
-function Row({ step, live, replayStatus, replayDim, replayError, replayDuration }) {
+function Row({ step, live, replayStatus, replayDim, replayError, replayDuration, onEdit, onDelete, canEdit }) {
   const [expanded, setExpanded] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const loc = step.locator || {};
   const hasShadow = Array.isArray(loc.shadowChain) && loc.shadowChain.length > 0;
   const ambiguous = loc.ambiguous || (loc.matchedCount && loc.matchedCount > 1);
@@ -23,12 +30,14 @@ function Row({ step, live, replayStatus, replayDim, replayError, replayDuration 
   const { action, target } = describe(step);
 
   const isNote = step.kind === "note";
+  const isAssert = step.kind === "assert";
   const cls = ["step", "step--clickable"];
   if (replayStatus === "running" && !isNote) cls.push("step--running");
   else if (replayStatus === "pass" && !isNote) cls.push("step--pass");
   else if (replayStatus === "fail") cls.push("step--fail");
   else if (live) cls.push("step--live");
   else if (isNote) cls.push("step--note-type");
+  else if (isAssert) cls.push("step--assert-type");
   else if (hasShadow) cls.push("step--shadow");
   if (replayDim) cls.push("step--dim");
   if (expanded) cls.push("step--expanded");
@@ -46,7 +55,11 @@ function Row({ step, live, replayStatus, replayDim, replayError, replayDuration 
   else if (replayStatus === "fail") iconCls.push("step__icon--fail");
 
   const fullSelector = (hasShadow ? loc.shadowChain.join(" » ") + " » " : "") + selector;
-  const onClick = () => setExpanded((v) => !v);
+  const onClick = (e) => {
+    if (e.target.closest?.(".step__menu")) return;
+    setExpanded((v) => !v);
+  };
+  const editable = canEdit && step.kind !== "navigate";
   return (
     <div className={cls.join(" ")} onClick={onClick} title={expanded ? "Click to collapse" : fullSelector}>
       <div className="step__num">{String(step.number || "").padStart(2, "0")}</div>
@@ -79,6 +92,29 @@ function Row({ step, live, replayStatus, replayDim, replayError, replayDuration 
           </div>
         )}
       </div>
+      {canEdit && (
+        <div className="step__menu" onClick={(e) => e.stopPropagation()}>
+          <button
+            className="step__menu-btn"
+            onClick={() => setMenuOpen((v) => !v)}
+            title="Step actions"
+          >
+            <More size={16} />
+          </button>
+          {menuOpen && (
+            <div className="step__menu-pop" onMouseLeave={() => setMenuOpen(false)}>
+              {editable && (
+                <button onClick={() => { setMenuOpen(false); onEdit?.(step); }}>
+                  <Edit size={14} /> Edit
+                </button>
+              )}
+              <button className="step__menu-danger" onClick={() => { setMenuOpen(false); onDelete?.(step); }}>
+                <Trash size={14} /> Delete
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -91,7 +127,10 @@ export default function StepList({
   replaySummary,
   onClear,
   onStop,
-  onReplay
+  onReplay,
+  onEditStep,
+  onDeleteStep,
+  canEditSteps
 }) {
   const bodyRef = useRef(null);
   useEffect(() => {
@@ -128,6 +167,9 @@ export default function StepList({
                 replayDim={dim}
                 replayError={status?.error}
                 replayDuration={status?.durationMs}
+                canEdit={canEditSteps && replayState !== "running"}
+                onEdit={onEditStep}
+                onDelete={onDeleteStep}
               />
             );
           })

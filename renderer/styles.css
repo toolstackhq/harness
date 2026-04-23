@@ -477,6 +477,43 @@ a:hover { text-decoration: underline; }
 .step--shadow { background: var(--teal-bg); border-left-color: var(--teal); }
 .step--note-type { background: var(--orange-bg); border-left-color: var(--orange); }
 .step--note-type .step__icon { background: var(--orange-bg); color: var(--orange); }
+.step--assert-type { background: var(--green-bg); border-left-color: var(--green); }
+.step--assert-type .step__icon { background: var(--green-bg); color: var(--green); }
+
+.step { position: relative; }
+.step__menu { position: absolute; top: 8px; right: 8px; opacity: 0; transition: opacity 0.1s; }
+.step:hover .step__menu { opacity: 1; }
+.step__menu-btn {
+  width: 24px; height: 24px; border-radius: 4px;
+  background: white; border: 1px solid var(--grey-300);
+  color: var(--grey-700); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.step__menu-btn:hover { background: var(--grey-50); }
+.step__menu-pop {
+  position: absolute; right: 0; top: 28px;
+  min-width: 140px;
+  background: white;
+  border: 1px solid var(--grey-300);
+  border-radius: 4px;
+  box-shadow: var(--shadow-1);
+  z-index: 10;
+  padding: 4px;
+  display: flex; flex-direction: column;
+}
+.step__menu-pop button {
+  display: flex; align-items: center; gap: 8px;
+  background: white; border: none;
+  padding: 8px 10px; font: 13px var(--font);
+  color: var(--grey-800);
+  cursor: pointer;
+  border-radius: 3px;
+  text-align: left;
+}
+.step__menu-pop button:hover { background: var(--grey-50); }
+.step__menu-danger { color: var(--red) !important; }
+.step__menu-danger:hover { background: var(--red-bg) !important; }
 .step__note-text {
   font-size: 12px;
   color: var(--grey-900);

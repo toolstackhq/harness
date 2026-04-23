@@ -450,6 +450,70 @@ to iterate on a custom mapping.
 
 ---
 
+### US-22 — PDF walkthrough with bounding-box annotations
+
+**Title:** Generate a print-ready PDF user guide from a Doc Gen
+recording, with the clicked element highlighted on each screenshot
+
+**Description:** In Doc Gen mode a screenshot is taken after every
+interactive step. Each screenshot is rendered in the report with a
+CSS-drawn bounding box (plus an optional numbered callout badge)
+positioned from the stored element rect + viewport. The report can
+then be exported as HTML or printed to PDF. The unified Export dialog
+handles both.
+
+**Acceptance:**
+- `recorder-script.js` enriches every snapshot with `rect` (element
+  `getBoundingClientRect`) and `viewport` (`innerWidth`,
+  `innerHeight`, `devicePixelRatio`) so annotation positions are
+  always scale-correct.
+- In Doc Gen sessions, `main.js` schedules a debounced
+  `capturePage()` after each non-navigate step, resizes to 800 px
+  wide, and attaches to the latest step without a shot. A
+  `stepShotBusy` flag prevents parallel captures.
+- HTML report template renders `<figure class="shot"><img><div
+  class="bbox"><span class="callout">` using `%` coords computed
+  from `rect / viewport`. Media query tightens spacing for print.
+- New PDF pipeline: write the HTML to a temp file, load into a
+  hidden BrowserWindow, `webContents.printToPDF({ pageSize: "A4",
+  printBackground: true })`, write to the user's chosen path.
+- Export dialog gets a `HTML / PDF` segmented toggle plus a
+  "Numbered callouts" checkbox; the label on the primary button
+  follows the selected format.
+
+**Commits:**
+- `69cb62c` feat(ui): record type toggle — Script Gen vs Doc Gen
+- `6a98f97` feat(ui): format toggle and callouts option in export dialog
+
+---
+
+### US-21 — Record type toggle (Script Gen vs Doc Gen)
+
+**Title:** Let the user pick *why* they are recording up front, so
+capture cost and output both match the intent
+
+**Description:** Script Gen and Doc Gen have different capture
+economies: Script Gen only needs one screenshot per page visit, Doc
+Gen wants one per click. Picking the mode on the startup screen
+avoids always paying the heavier cost.
+
+**Acceptance:**
+- Startup screen shows a two-option radio above the framework
+  picker: Script Gen (CODE badge) and Doc Gen (PDF badge).
+- Framework picker and Custom mapping editor only render in
+  Script Gen mode.
+- Selected record type persists to settings and is carried
+  through `recorder:start` IPC and the saved session.
+- Primary AppBar action label + icon flip by mode: "Generate
+  Script" (code icon) in Script Gen, "Generate PDF" (save icon)
+  in Doc Gen. Secondary Export-Journey action stays available
+  in both modes.
+
+**Commits:**
+- `69cb62c` feat(ui): record type toggle — Script Gen vs Doc Gen
+
+---
+
 ### US-20 — Export user journey with screenshots
 
 **Title:** Export a reviewable HTML user journey, one screenshot per

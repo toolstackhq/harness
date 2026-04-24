@@ -10,6 +10,7 @@ import NoteComposer from "./components/NoteComposer.jsx";
 import StepEditDialog from "./components/StepEditDialog.jsx";
 import AssertionDialog from "./components/AssertionDialog.jsx";
 import CaptureOverlay from "./components/CaptureOverlay.jsx";
+import WaitDialog from "./components/WaitDialog.jsx";
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -23,6 +24,8 @@ export default function App() {
   const [assertOpen, setAssertOpen] = useState(false);
   const [editingStep, setEditingStep] = useState(null);
   const [capture, setCapture] = useState(null);
+  const [waitDialog, setWaitDialog] = useState(null); // null | { mode: "add" } | { mode: "after", step }
+  const [paused, setPaused] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -33,10 +36,17 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const offPaused = window.recrd.recorder.onPaused(() => setPaused(true));
+    const offResumed = window.recrd.recorder.onResumed(() => setPaused(false));
+    return () => { offPaused(); offResumed(); };
+  }, []);
+
+  useEffect(() => {
     const offClosed = window.recrd.recorder.onSessionClosed(() => {
       setSession(null);
       setInitialSteps(null);
       setSteps([]);
+      setPaused(false);
     });
     const offReplayLoaded = window.recrd.recorder.onReplayLoaded(({ session: replaySession, steps: replaySteps }) => {
       setDetail(null);
@@ -47,9 +57,9 @@ export default function App() {
     return () => { offClosed(); offReplayLoaded(); };
   }, []);
 
-  const onStart = async ({ recordType, framework, url }) => {
+  const onStart = async ({ recordType, framework, viewport, url }) => {
     setBusy(true);
-    const result = await window.recrd.recorder.start({ recordType, framework, url });
+    const result = await window.recrd.recorder.start({ recordType, framework, viewport, url });
     setBusy(false);
     if (!result.ok) {
       alert(`Failed to start recording: ${result.error}`);
@@ -58,6 +68,7 @@ export default function App() {
     setSession({
       framework: result.framework,
       recordType: recordType || "script",
+      viewport: result.viewport || viewport || "desktop",
       url: result.url,
       startedAt: Date.now(),
       stopped: false,
@@ -117,6 +128,23 @@ export default function App() {
     return true;
   };
 
+  const onTogglePause = async () => {
+    await window.recrd.recorder.togglePause();
+  };
+  const onAddWait = () => setWaitDialog({ mode: "add" });
+  const onInsertWaitAfter = (step) => setWaitDialog({ mode: "after", step });
+  const saveWait = async (ms) => {
+    if (!waitDialog) return false;
+    const result = waitDialog.mode === "after"
+      ? await window.recrd.recorder.insertWaitAfter(waitDialog.step.number, ms)
+      : await window.recrd.recorder.addWait(ms);
+    if (!result?.ok) {
+      alert(result?.error || "Failed to add wait.");
+      return false;
+    }
+    return true;
+  };
+
   const onRenameSession = async (name) => {
     const result = await window.recrd.sessions.setActiveName(name);
     if (result?.ok) setSession((s) => s ? { ...s, name: result.name } : s);
@@ -165,6 +193,10 @@ export default function App() {
       } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "S" || e.key === "s")) {
         e.preventDefault();
         onCaptureArea();
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "P" || e.key === "p")) {
+        if (!session.stopped) { e.preventDefault(); onTogglePause(); }
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "W" || e.key === "w")) {
+        if (!session.stopped) { e.preventDefault(); onAddWait(); }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -243,20 +275,20 @@ export default function App() {
         primary={
           session
             ? {
-                label: session.recordType === "doc" ? "Generate PDF" : "Generate Script",
+                label: session.recordType === "doc" ? "Export walkthrough" : "Generate Script",
                 icon: session.recordType === "doc" ? "save" : "code",
                 onClick: onGenerate,
                 disabled: steps.length === 0 || !session.stopped,
                 title: !session.stopped
                   ? "Stop recording first"
-                  : (steps.length === 0 ? "No steps yet" : "Generate output")
+                  : (steps.length === 0 ? "No steps yet" : (session.recordType === "doc" ? "Open export dialog" : "Generate output"))
               }
             : null
         }
         secondary={
-          session
+          session && session.recordType !== "doc"
             ? {
-                label: session.recordType === "doc" ? "Export HTML" : "Export Journey",
+                label: "Export Journey",
                 icon: "save",
                 onClick: () => onOpenJourney("html"),
                 disabled: steps.length === 0 || !session.stopped,
@@ -280,6 +312,10 @@ export default function App() {
           onCaptureArea={onCaptureArea}
           onEditStep={onEditStep}
           onDeleteStep={onDeleteStep}
+          onInsertWaitAfter={onInsertWaitAfter}
+          onAddWait={onAddWait}
+          onTogglePause={onTogglePause}
+          paused={paused}
           sessionName={session.name}
           onRenameSession={onRenameSession}
           onStepsChange={setSteps}
@@ -332,6 +368,13 @@ export default function App() {
           url={capture.url}
           onSave={saveCapture}
           onClose={closeCapture}
+        />
+      )}
+      {waitDialog && (
+        <WaitDialog
+          title={waitDialog.mode === "after" ? `Insert wait after step ${String(waitDialog.step.number).padStart(2, "0")}` : "Add wait"}
+          onSave={saveWait}
+          onClose={() => setWaitDialog(null)}
         />
       )}
       {detail && (

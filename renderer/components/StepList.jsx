@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
-import { actionIcon, Check, Close, Spinner, Play, More, Edit, Trash } from "./Icons.jsx";
+import { actionIcon, Check, Close, Spinner, Play, More, Edit, Trash, Clock } from "./Icons.jsx";
 
 function describe(step) {
   const loc = step.locator || {};
   const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
   if (step.kind === "note") return { action: "note", target: (step.text || "").split("\n")[0] };
+  if (step.kind === "wait") return { action: "wait", target: `${Number(step.ms) || 0}ms` };
   if (step.kind === "capture") return { action: "capture area", target: (step.text || "(annotated region)").split("\n")[0] };
   if (step.kind === "assert") {
     const sel = loc.css || loc.xpath || "";
@@ -21,7 +22,7 @@ function describe(step) {
   return { action: step.kind, target: label };
 }
 
-function Row({ step, live, replayStatus, replayDim, replayError, replayDuration, onEdit, onDelete, canEdit }) {
+function Row({ step, live, replayStatus, replayDim, replayError, replayDuration, onEdit, onDelete, onInsertWait, canEdit }) {
   const [expanded, setExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const loc = step.locator || {};
@@ -112,6 +113,11 @@ function Row({ step, live, replayStatus, replayDim, replayError, replayDuration,
                   <Edit size={14} /> Edit
                 </button>
               )}
+              {onInsertWait && (
+                <button onClick={() => { setMenuOpen(false); onInsertWait?.(step); }}>
+                  <Clock size={14} /> Insert wait after
+                </button>
+              )}
               <button className="step__menu-danger" onClick={() => { setMenuOpen(false); onDelete?.(step); }}>
                 <Trash size={14} /> Delete
               </button>
@@ -179,6 +185,7 @@ export default function StepList({
   onReplay,
   onEditStep,
   onDeleteStep,
+  onInsertWaitAfter,
   canEditSteps
 }) {
   const bodyRef = useRef(null);
@@ -222,6 +229,7 @@ export default function StepList({
                 canEdit={canEditSteps && replayState !== "running"}
                 onEdit={onEditStep}
                 onDelete={onDeleteStep}
+                onInsertWait={onInsertWaitAfter}
               />
             );
           })

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Back, Forward, Reload, Note, Assert, Camera } from "./Icons.jsx";
+import { Back, Forward, Reload, Note, Assert, Camera, Pause, Play, Clock } from "./Icons.jsx";
 
 function formatElapsed(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
@@ -22,7 +22,10 @@ export default function BrowserToolbar({
   onAddAssertion,
   canAddAssertion,
   onCaptureArea,
-  canCapture
+  canCapture,
+  paused,
+  onTogglePause,
+  onAddWait
 }) {
   const [value, setValue] = useState(url || "");
   const [elapsed, setElapsed] = useState(0);
@@ -90,11 +93,38 @@ export default function BrowserToolbar({
           <Camera size={14} /> Capture area
         </button>
       )}
+      {recording && onAddWait && (
+        <button
+          className="btn btn--secondary"
+          style={{ height: 32, padding: "0 10px", fontSize: 12 }}
+          onClick={onAddWait}
+          title="Add a wait step (Ctrl+Shift+W)"
+        >
+          <Clock size={14} /> Wait
+        </button>
+      )}
+      {recording && onTogglePause && (
+        <button
+          className="btn btn--secondary"
+          style={{ height: 32, padding: "0 10px", fontSize: 12 }}
+          onClick={onTogglePause}
+          title={paused ? "Resume capture (Ctrl+Shift+P)" : "Pause capture (Ctrl+Shift+P)"}
+        >
+          {paused ? <Play size={14} /> : <Pause size={14} />} {paused ? "Resume" : "Pause"}
+        </button>
+      )}
       {recording ? (
-        <div className="rec-chip">
-          <span className="rec-chip__dot" />
-          REC · {formatElapsed(elapsed)}
-        </div>
+        paused ? (
+          <div className="stopped-chip" style={{ background: "var(--orange-bg)", color: "var(--orange)", borderColor: "var(--orange)" }}>
+            <span className="stopped-chip__dot" style={{ background: "var(--orange)" }} />
+            PAUSED · {formatElapsed(elapsed)}
+          </div>
+        ) : (
+          <div className="rec-chip">
+            <span className="rec-chip__dot" />
+            REC · {formatElapsed(elapsed)}
+          </div>
+        )
       ) : (
         <div className="stopped-chip">
           <span className="stopped-chip__dot" />

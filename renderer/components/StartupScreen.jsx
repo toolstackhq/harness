@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import FrameworkSelector from "./FrameworkSelector.jsx";
 import RecordTypeSelector from "./RecordTypeSelector.jsx";
+import ViewportSelector from "./ViewportSelector.jsx";
 import { Play, Globe } from "./Icons.jsx";
 
 function Chip({ framework }) {
@@ -22,10 +23,12 @@ function formatAt(ts) {
 export default function StartupScreen({ onStart, onOpenSession }) {
   const [recordType, setRecordType] = useState("script");
   const [framework, setFramework] = useState("playwright");
+  const [viewport, setViewport] = useState("desktop");
   const [url, setUrl] = useState("https://example.com");
   const [mapping, setMapping] = useState("");
   const [mappingError, setMappingError] = useState("");
   const [sessions, setSessions] = useState([]);
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
 
   const loadSessions = async () => {
@@ -40,6 +43,7 @@ export default function StartupScreen({ onStart, onOpenSession }) {
       if (!mounted) return;
       setRecordType(settings.recordType || "script");
       setFramework(settings.framework || "playwright");
+      setViewport(settings.viewport || "desktop");
       setUrl(settings.lastUrl || "https://example.com");
       setMapping(JSON.stringify(settings.customMapping || {}, null, 2));
       await loadSessions();
@@ -72,10 +76,11 @@ export default function StartupScreen({ onStart, onOpenSession }) {
       await window.recrd.settings.set({
         recordType,
         framework,
+        viewport,
         lastUrl: url,
         ...(customMapping ? { customMapping } : {})
       });
-      await onStart({ recordType, framework, url });
+      await onStart({ recordType, framework, viewport, url });
     } finally {
       setLoading(false);
     }
@@ -104,6 +109,10 @@ export default function StartupScreen({ onStart, onOpenSession }) {
               <div className="field">
                 <label className="field__label">Recording type</label>
                 <RecordTypeSelector value={recordType} onChange={setRecordType} />
+              </div>
+              <div className="field">
+                <label className="field__label">Viewport</label>
+                <ViewportSelector value={viewport} onChange={setViewport} />
               </div>
               {recordType === "script" && (
                 <div className="field">
@@ -142,11 +151,28 @@ export default function StartupScreen({ onStart, onOpenSession }) {
               <div className="card__subtitle">Click a session to view steps, replay, or copy the generated script.</div>
             </div>
             <div className="card__body" style={{ padding: 8 }}>
+              {sessions.length > 0 && (
+                <div style={{ padding: "4px 4px 8px" }}>
+                  <input
+                    className="field__input"
+                    placeholder="Search by name or URL…"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    style={{ fontSize: 13 }}
+                  />
+                </div>
+              )}
               {sessions.length === 0 ? (
                 <div className="recent-item__empty">No saved sessions yet.</div>
               ) : (
-                <div className="sessions-list">
-                  {sessions.map((s) => (
+                (() => {
+                  const q = query.trim().toLowerCase();
+                  const filtered = q
+                    ? sessions.filter((s) => (s.name || "").toLowerCase().includes(q) || (s.url || "").toLowerCase().includes(q))
+                    : sessions;
+                  if (!filtered.length) return <div className="recent-item__empty">No sessions match "{query}".</div>;
+                  return <div className="sessions-list">
+                  {filtered.map((s) => (
                     <div className="session-row" key={s.id} onClick={() => onOpenSession?.(s)}>
                       <div className="session-row__icon"><Globe size={18} /></div>
                       <div className="session-row__body">
@@ -161,7 +187,8 @@ export default function StartupScreen({ onStart, onOpenSession }) {
                       <Chip framework={s.framework} />
                     </div>
                   ))}
-                </div>
+                </div>;
+                })()
               )}
             </div>
           </div>

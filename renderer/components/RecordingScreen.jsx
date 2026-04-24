@@ -13,8 +13,12 @@ export default function RecordingScreen({
   onCaptureArea,
   onEditStep,
   onDeleteStep,
+  onInsertWaitAfter,
+  onAddWait,
+  onTogglePause,
   onRenameSession,
   sessionName,
+  paused,
   onStepsChange
 }) {
   const [url, setUrl] = useState(session.url);
@@ -153,6 +157,9 @@ export default function RecordingScreen({
         onAddAssertion={onAddAssertion}
         canCapture={true}
         onCaptureArea={onCaptureArea}
+        paused={paused}
+        onTogglePause={onTogglePause}
+        onAddWait={onAddWait}
       />
       <InfoBar
         cdp={recording}
@@ -177,6 +184,7 @@ export default function RecordingScreen({
           canEditSteps
           onEditStep={onEditStep}
           onDeleteStep={onDeleteStep}
+          onInsertWaitAfter={onInsertWaitAfter}
           sessionName={sessionName}
           onRenameSession={onRenameSession}
         />

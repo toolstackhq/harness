@@ -483,6 +483,145 @@ to iterate on a custom mapping.
 
 ---
 
+### US-34 — Drop `abstract` codegen alias
+
+**Title:** Remove the dead `abstract` framework synonym inherited
+from the legacy CLI
+
+**Description:** `codegen.js` treated `"abstract"` as a synonym
+for `"custom"`; nothing in the app references `"abstract"` any
+more. Dead code removed.
+
+**Commits:**
+- `62dc695` feat: viewport emulation, pause/resume, wait step, drop abstract alias
+
+---
+
+### US-33 — Merge Doc Gen export entry points
+
+**Title:** One Export button in Doc Gen instead of two
+similar-looking primary/secondary actions
+
+**Description:** In Doc Gen mode the app had both a primary
+"Generate PDF" button and a secondary "Export HTML" button that
+opened the same dialog with different defaults — users had to
+learn which was which. Collapsed to a single primary **Export
+walkthrough** button that opens the export dialog; the existing
+HTML/PDF toggle inside the dialog selects the format.
+
+**Acceptance:**
+- Doc Gen mode: AppBar primary is "Export walkthrough",
+  secondary is null.
+- Script Gen mode unchanged: primary remains "Generate Script",
+  secondary remains "Export Journey".
+
+**Commits:**
+- `437c1dc` feat(ui): viewport selector, pause toggle, Wait button, session search, merged export
+
+---
+
+### US-32 — Search / filter sessions
+
+**Title:** Let users search the recent-sessions list by name or
+URL when the list grows beyond a handful
+
+**Description:** With the 20-session cap the history list quickly
+exceeds a glance. A single input over the list filters entries in
+real time (case-insensitive contains match on name and URL).
+
+**Acceptance:**
+- Search input renders only when there is at least one session.
+- Empty results state: `No sessions match "query"`.
+- No debounce — list is small enough that keystrokes are
+  non-jittery.
+
+**Commits:**
+- `437c1dc` feat(ui): viewport selector, pause toggle, Wait button, session search, merged export
+
+---
+
+### US-31 — Wait / sleep step
+
+**Title:** Let users insert explicit waits into a recording; render
+them as the framework-native timeout calls
+
+**Description:** Test and doc flows often need to pause for
+transitions, animations, or async loading. A dedicated wait step
+kind makes this first-class — append via the toolbar button, or
+insert mid-flow from the ⋯ menu on any step row.
+
+**Acceptance:**
+- Recorder: `addWait(ms)` appends; `insertWaitAfterNumber(n, ms)`
+  splices a wait step after a specific step number.
+- Toolbar "Wait" button (Ctrl+Shift+W) adds at the end; row menu
+  "Insert wait after" inserts right after that step.
+- WaitDialog: numeric ms input, Enter to commit, Esc to cancel.
+- Codegen: Playwright `page.waitForTimeout`, Cypress `cy.wait`,
+  Selenium `driver.sleep`; Custom mapping key `wait:
+  "await this.wait({ms})"`.
+- Replay engine honors the ms (actually sleeps for the requested
+  duration), so replay timing reflects intent.
+
+**Commits:**
+- `62dc695` feat: viewport emulation, pause/resume, wait step, drop abstract alias
+- `437c1dc` feat(ui): viewport selector, pause toggle, Wait button, session search, merged export
+
+---
+
+### US-30 — Pause / resume capture
+
+**Title:** Let users temporarily stop capture without ending the
+session, for setup work they don't want in the script
+
+**Description:** Previously Stop was terminal — if a user needed
+to navigate around (log in, seed data) without those clicks
+polluting the script, they had to stop-and-restart. Pause lets
+them toggle capture off, do setup work, then resume where they
+left off.
+
+**Acceptance:**
+- Recorder already had `pause()` / `resume()` methods; IPC
+  `recorder:toggle-pause` flips the state.
+- Toolbar pause/resume button with Ctrl+Shift+P shortcut.
+- While paused: REC chip becomes a muted orange PAUSED chip,
+  capture script payloads are gated (via `this.paused`), the
+  elapsed timer keeps running.
+- Stop and debugger detach behavior unchanged — pause is purely
+  a capture filter.
+
+**Commits:**
+- `62dc695` feat: viewport emulation, pause/resume, wait step, drop abstract alias
+- `437c1dc` feat(ui): viewport selector, pause toggle, Wait button, session search, merged export
+
+---
+
+### US-29a — Viewport presets (Desktop / Tablet / Mobile)
+
+**Title:** Let users record at device-specific viewports instead
+of always using the host window's dimensions
+
+**Description:** Table stakes for real test teams. Desktop
+(1440×900, no emulation), Tablet (768×1024, iPad UA), Mobile
+(390×844, iPhone UA) with touch emulation enabled on the mobile
+presets.
+
+**Acceptance:**
+- Viewport segmented control on the startup screen, persisted
+  across sessions.
+- Applied via CDP `Emulation.setDeviceMetricsOverride`,
+  `setUserAgentOverride`, and `setTouchEmulationEnabled`.
+- Desktop clears overrides so sites serve their real desktop
+  experience.
+- Viewport is stored on the session and round-trips through
+  history, so replay uses the same emulation as the original
+  recording.
+
+**Commits:**
+- `62dc695` feat: viewport emulation, pause/resume, wait step, drop abstract alias
+- `437c1dc` feat(ui): viewport selector, pause toggle, Wait button, session search, merged export
+
+---
+
 ### US-29 — Named sessions
 
 **Title:** Let users name each recording ("Checkout flow",

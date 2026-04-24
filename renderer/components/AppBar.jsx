@@ -19,7 +19,7 @@ export default function AppBar({ section, primary, secondary }) {
     <div className="app-bar">
       <div className="app-bar__logo"><Logo size={16} /></div>
       <div className="app-bar__title">
-        Recrd
+        Harness
         {section && <span className="app-bar__section">{section}</span>}
       </div>
       <div className="app-bar__spacer" />

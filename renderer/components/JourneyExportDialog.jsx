@@ -44,7 +44,7 @@ export default function JourneyExportDialog({ steps, onClose, defaultFormat = "h
     setBusy(true);
     try {
       const indices = [...selected].sort((a, b) => a - b);
-      const result = await window.recrd.journey.export({ indices, format, callouts });
+      const result = await window.harness.journey.export({ indices, format, callouts });
       if (result?.ok) onClose?.();
       else if (result && result.error) alert(result.error);
     } finally {

@@ -70,14 +70,14 @@ export default function SessionDetailModal({ session, onClose, onDelete, onRepla
     setEditingName(false);
     const trimmed = name.trim();
     if ((trimmed || null) === (session.name || null)) return;
-    const result = await window.recrd.sessions.rename(session.id, trimmed);
+    const result = await window.harness.sessions.rename(session.id, trimmed);
     if (result?.ok) onUpdate?.(result.session);
   };
 
   const generate = async () => {
     setGenerating(true);
     try {
-      const result = await window.recrd.sessions.generate(session.id);
+      const result = await window.harness.sessions.generate(session.id);
       if (result.ok) {
         setScript(result.code);
         onUpdate?.(result.session);
@@ -87,14 +87,14 @@ export default function SessionDetailModal({ session, onClose, onDelete, onRepla
     }
   };
 
-  const copyScript = () => window.recrd.script.copy(script);
-  const saveScript = () => window.recrd.sessions.saveFile({
+  const copyScript = () => window.harness.script.copy(script);
+  const saveScript = () => window.harness.sessions.saveFile({
     script,
     filename: `session-${session.id.slice(0, 8)}.spec.js`
   });
 
   const del = async () => {
-    await window.recrd.sessions.delete(session.id);
+    await window.harness.sessions.delete(session.id);
     onDelete?.(session.id);
   };
 

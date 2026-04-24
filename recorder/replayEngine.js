@@ -2,8 +2,8 @@
 
 const QS_DEEP = `
 (() => {
-  if (window.__recrdHighlight) return;
-  window.__recrdHighlight = function(el) {
+  if (window.__harnessHighlight) return;
+  window.__harnessHighlight = function(el) {
     try {
       if (!el || !el.getBoundingClientRect) return;
       const rect = el.getBoundingClientRect();
@@ -24,7 +24,7 @@ const QS_DEEP = `
         "transition:opacity 0.4s ease-out",
         "opacity:1"
       ].join(";");
-      box.setAttribute("data-recrd-highlight", "1");
+      box.setAttribute("data-harness-highlight", "1");
       (document.body || document.documentElement).appendChild(box);
       setTimeout(() => { box.style.opacity = "0"; }, 450);
       setTimeout(() => { try { box.remove(); } catch (_) {} }, 900);
@@ -101,7 +101,7 @@ async function highlight(dbg, selector) {
   const js = `(() => {
     const el = window.__qsDeep(${JSON.stringify(selector)});
     if (!el) return false;
-    window.__recrdHighlight(el);
+    window.__harnessHighlight(el);
     return true;
   })()`;
   const ok = await evalInPage(dbg, js);

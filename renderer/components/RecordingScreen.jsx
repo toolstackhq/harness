@@ -37,7 +37,7 @@ export default function RecordingScreen({
   const pushBounds = () => {
     if (!paneRef.current) return;
     const rect = paneRef.current.getBoundingClientRect();
-    window.recrd.browser.setBounds({
+    window.harness.browser.setBounds({
       x: Math.round(rect.left),
       y: Math.round(rect.top),
       width: Math.round(rect.width),
@@ -54,7 +54,7 @@ export default function RecordingScreen({
   }, []);
 
   useEffect(() => {
-    const offStep = window.recrd.recorder.onStep(({ step, stepCount, shadowCount, warningCount }) => {
+    const offStep = window.harness.recorder.onStep(({ step, stepCount, shadowCount, warningCount }) => {
       setSteps((prev) => {
         if (step.kind === "fill") {
           const last = prev[prev.length - 1];
@@ -68,35 +68,35 @@ export default function RecordingScreen({
       });
       setCounts({ stepCount, shadowCount, warningCount });
     });
-    const offCleared = window.recrd.recorder.onCleared(() => {
+    const offCleared = window.harness.recorder.onCleared(() => {
       setSteps([]);
       setCounts({ stepCount: 0, shadowCount: 0, warningCount: 0 });
       setReplaySummary(null);
       setReplayStatuses({});
     });
-    const offUrl = window.recrd.browser.onUrlChanged(({ url }) => setUrl(url));
-    const offStopped = window.recrd.recorder.onStopped(() => {
+    const offUrl = window.harness.browser.onUrlChanged(({ url }) => setUrl(url));
+    const offStopped = window.harness.recorder.onStopped(() => {
       setRecording(false);
     });
-    const offChanged = window.recrd.recorder.onStepsChanged(({ steps: fresh }) => {
+    const offChanged = window.harness.recorder.onStepsChanged(({ steps: fresh }) => {
       if (Array.isArray(fresh)) setSteps(fresh);
     });
     return () => { offStep(); offCleared(); offUrl(); offStopped(); offChanged(); };
   }, []);
 
   useEffect(() => {
-    const offStarted = window.recrd.replay.onStarted(() => {
+    const offStarted = window.harness.replay.onStarted(() => {
       setReplayState("running");
       setReplayStatuses({});
       setReplaySummary(null);
     });
-    const offPass = window.recrd.replay.onStepPass(({ stepIndex, durationMs }) => {
+    const offPass = window.harness.replay.onStepPass(({ stepIndex, durationMs }) => {
       setReplayStatuses((prev) => ({ ...prev, [stepIndex]: { status: "pass", durationMs } }));
     });
-    const offFail = window.recrd.replay.onStepFail(({ stepIndex, error, durationMs }) => {
+    const offFail = window.harness.replay.onStepFail(({ stepIndex, error, durationMs }) => {
       setReplayStatuses((prev) => ({ ...prev, [stepIndex]: { status: "fail", error, durationMs } }));
     });
-    const offDone = window.recrd.replay.onComplete(({ passed, failed, total }) => {
+    const offDone = window.harness.replay.onComplete(({ passed, failed, total }) => {
       setReplayState("done");
       setReplaySummary({ passed, failed, total });
     });
@@ -108,7 +108,7 @@ export default function RecordingScreen({
       setReplayStatuses({});
       setReplaySummary(null);
       setReplayState("running");
-      window.recrd.replay.start();
+      window.harness.replay.start();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoReplay]);
@@ -128,16 +128,16 @@ export default function RecordingScreen({
   if (runningIndex >= 0) mergedStatuses[runningIndex] = { status: "running" };
 
   const onClear = async () => {
-    await window.recrd.recorder.clear();
+    await window.harness.recorder.clear();
     setReplaySummary(null);
     setReplayStatuses({});
   };
-  const onStop = async () => { await window.recrd.recorder.stop(); };
+  const onStop = async () => { await window.harness.recorder.stop(); };
   const onReplay = async () => {
     setReplayStatuses({});
     setReplaySummary(null);
     setReplayState("running");
-    await window.recrd.replay.start();
+    await window.harness.replay.start();
   };
 
   return (
@@ -146,10 +146,10 @@ export default function RecordingScreen({
         url={url}
         startedAt={session.startedAt}
         recording={recording}
-        onNavigate={(u) => window.recrd.browser.navigate(u)}
-        onBack={() => window.recrd.browser.back()}
-        onForward={() => window.recrd.browser.forward()}
-        onReload={() => window.recrd.browser.reload()}
+        onNavigate={(u) => window.harness.browser.navigate(u)}
+        onBack={() => window.harness.browser.back()}
+        onForward={() => window.harness.browser.forward()}
+        onReload={() => window.harness.browser.reload()}
         onNewSession={onNewSession}
         canAddNote={true}
         onAddNote={onAddNote}

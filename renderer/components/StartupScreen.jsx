@@ -32,14 +32,14 @@ export default function StartupScreen({ onStart, onOpenSession }) {
   const [loading, setLoading] = useState(false);
 
   const loadSessions = async () => {
-    const list = await window.recrd.sessions.load();
+    const list = await window.harness.sessions.load();
     setSessions(Array.isArray(list) ? list : []);
   };
 
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const settings = await window.recrd.settings.get();
+      const settings = await window.harness.settings.get();
       if (!mounted) return;
       setRecordType(settings.recordType || "script");
       setFramework(settings.framework || "playwright");
@@ -73,7 +73,7 @@ export default function StartupScreen({ onStart, onOpenSession }) {
     }
     setLoading(true);
     try {
-      await window.recrd.settings.set({
+      await window.harness.settings.set({
         recordType,
         framework,
         viewport,

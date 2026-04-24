@@ -29,26 +29,26 @@ export default function App() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const off = window.recrd.recorder.onError(({ message }) => {
+    const off = window.harness.recorder.onError(({ message }) => {
       alert(`Recorder error: ${message}`);
     });
     return () => off();
   }, []);
 
   useEffect(() => {
-    const offPaused = window.recrd.recorder.onPaused(() => setPaused(true));
-    const offResumed = window.recrd.recorder.onResumed(() => setPaused(false));
+    const offPaused = window.harness.recorder.onPaused(() => setPaused(true));
+    const offResumed = window.harness.recorder.onResumed(() => setPaused(false));
     return () => { offPaused(); offResumed(); };
   }, []);
 
   useEffect(() => {
-    const offClosed = window.recrd.recorder.onSessionClosed(() => {
+    const offClosed = window.harness.recorder.onSessionClosed(() => {
       setSession(null);
       setInitialSteps(null);
       setSteps([]);
       setPaused(false);
     });
-    const offReplayLoaded = window.recrd.recorder.onReplayLoaded(({ session: replaySession, steps: replaySteps }) => {
+    const offReplayLoaded = window.harness.recorder.onReplayLoaded(({ session: replaySession, steps: replaySteps }) => {
       setDetail(null);
       setSession(replaySession);
       setInitialSteps(replaySteps);
@@ -59,7 +59,7 @@ export default function App() {
 
   const onStart = async ({ recordType, framework, viewport, url }) => {
     setBusy(true);
-    const result = await window.recrd.recorder.start({ recordType, framework, viewport, url });
+    const result = await window.harness.recorder.start({ recordType, framework, viewport, url });
     setBusy(false);
     if (!result.ok) {
       alert(`Failed to start recording: ${result.error}`);
@@ -79,7 +79,7 @@ export default function App() {
   };
 
   const onNewSession = async () => {
-    await window.recrd.recorder.close();
+    await window.harness.recorder.close();
   };
 
   const onAddNote = () => {
@@ -87,7 +87,7 @@ export default function App() {
     setNoteOpen(true);
   };
   const saveNote = async (text) => {
-    const result = await window.recrd.recorder.addNote(text);
+    const result = await window.harness.recorder.addNote(text);
     if (!result?.ok) {
       alert(result?.error || "Failed to add note.");
       return false;
@@ -100,7 +100,7 @@ export default function App() {
     setAssertOpen(true);
   };
   const saveAssertion = async (payload) => {
-    const result = await window.recrd.recorder.addAssertion(payload);
+    const result = await window.harness.recorder.addAssertion(payload);
     if (!result?.ok) {
       alert(result?.error || "Failed to add assertion.");
       return false;
@@ -110,17 +110,17 @@ export default function App() {
 
   const onCaptureArea = async () => {
     if (!session) return;
-    const snap = await window.recrd.capture.snapshot();
+    const snap = await window.harness.capture.snapshot();
     if (!snap?.ok) { alert(snap?.error || "Could not capture the page."); return; }
-    await window.recrd.browser.setVisible(false);
+    await window.harness.browser.setVisible(false);
     setCapture({ dataUrl: snap.dataUrl, url: snap.url });
   };
   const closeCapture = async () => {
     setCapture(null);
-    if (session) await window.recrd.browser.setVisible(true);
+    if (session) await window.harness.browser.setVisible(true);
   };
   const saveCapture = async ({ screenshot, rect, text, url }) => {
-    const result = await window.recrd.capture.save({ screenshot, rect, text, url });
+    const result = await window.harness.capture.save({ screenshot, rect, text, url });
     if (!result?.ok) {
       alert(result?.error || "Failed to save capture.");
       return false;
@@ -129,15 +129,15 @@ export default function App() {
   };
 
   const onTogglePause = async () => {
-    await window.recrd.recorder.togglePause();
+    await window.harness.recorder.togglePause();
   };
   const onAddWait = () => setWaitDialog({ mode: "add" });
   const onInsertWaitAfter = (step) => setWaitDialog({ mode: "after", step });
   const saveWait = async (ms) => {
     if (!waitDialog) return false;
     const result = waitDialog.mode === "after"
-      ? await window.recrd.recorder.insertWaitAfter(waitDialog.step.number, ms)
-      : await window.recrd.recorder.addWait(ms);
+      ? await window.harness.recorder.insertWaitAfter(waitDialog.step.number, ms)
+      : await window.harness.recorder.addWait(ms);
     if (!result?.ok) {
       alert(result?.error || "Failed to add wait.");
       return false;
@@ -146,7 +146,7 @@ export default function App() {
   };
 
   const onRenameSession = async (name) => {
-    const result = await window.recrd.sessions.setActiveName(name);
+    const result = await window.harness.sessions.setActiveName(name);
     if (result?.ok) setSession((s) => s ? { ...s, name: result.name } : s);
   };
 
@@ -154,7 +154,7 @@ export default function App() {
   const saveStepEdit = async (patch) => {
     if (!editingStep) return false;
     if (Object.keys(patch).length === 0) return true;
-    const result = await window.recrd.recorder.updateStep(editingStep.number, patch);
+    const result = await window.harness.recorder.updateStep(editingStep.number, patch);
     if (!result?.ok) {
       alert(result?.error || "Failed to update step.");
       return false;
@@ -165,7 +165,7 @@ export default function App() {
     if (!step?.number) return;
     const confirmed = window.confirm(`Delete step ${String(step.number).padStart(2, "0")}?`);
     if (!confirmed) return;
-    await window.recrd.recorder.deleteStep(step.number);
+    await window.harness.recorder.deleteStep(step.number);
   };
 
   const lastInteractiveSelector = (() => {
@@ -208,41 +208,41 @@ export default function App() {
     if (session.recordType === "doc") {
       return onOpenJourney("pdf");
     }
-    const result = await window.recrd.script.generate({ framework: session.framework });
+    const result = await window.harness.script.generate({ framework: session.framework });
     if (!result.ok) {
       alert(result.error || "No steps yet.");
       return;
     }
-    await window.recrd.browser.setVisible(false);
+    await window.harness.browser.setVisible(false);
     setDialog({ code: result.code, framework: result.framework });
   };
 
   const closeDialog = async () => {
     setDialog(null);
-    if (session) await window.recrd.browser.setVisible(true);
+    if (session) await window.harness.browser.setVisible(true);
   };
 
   const onOpenJourney = async (defaultFormat = "html") => {
     if (!session) return;
-    const result = await window.recrd.journey.getSteps();
+    const result = await window.harness.journey.getSteps();
     if (!result?.ok) {
       alert(result?.error || "No steps available.");
       return;
     }
-    await window.recrd.browser.setVisible(false);
+    await window.harness.browser.setVisible(false);
     setJourney({ steps: result.steps || [], defaultFormat });
   };
 
   const closeJourney = async () => {
     setJourney(null);
-    if (session) await window.recrd.browser.setVisible(true);
+    if (session) await window.harness.browser.setVisible(true);
   };
 
   const onReplaySession = async (sessionEntry) => {
     setDetail(null);
     setBusy(true);
     try {
-      await window.recrd.sessions.replay(sessionEntry.id);
+      await window.harness.sessions.replay(sessionEntry.id);
     } catch (err) {
       alert(`Replay failed: ${String(err?.message || err)}`);
     } finally {
@@ -252,18 +252,18 @@ export default function App() {
 
   const canLeave = !session || session.stopped;
   const goHome = canLeave
-    ? async () => { if (session) await window.recrd.recorder.close(); }
+    ? async () => { if (session) await window.harness.recorder.close(); }
     : null;
   const homeTitle = canLeave ? "Back to sessions" : "Stop recording to leave";
 
   const breadcrumb = session
     ? [
-        { label: "Recrd", onClick: goHome, title: homeTitle },
+        { label: "Harness", onClick: goHome, title: homeTitle },
         { label: "Sessions", onClick: goHome, title: homeTitle },
         { label: session.stopped ? "Review" : "Recording" }
       ]
     : [
-        { label: "Recrd" },
+        { label: "Harness" },
         { label: "Sessions" },
         { label: "New session" }
       ];
@@ -331,8 +331,8 @@ export default function App() {
           code={dialog.code}
           framework={dialog.framework}
           onClose={closeDialog}
-          onCopy={() => window.recrd.script.copy(dialog.code)}
-          onSave={() => window.recrd.script.save({ code: dialog.code, framework: dialog.framework })}
+          onCopy={() => window.harness.script.copy(dialog.code)}
+          onSave={() => window.harness.script.save({ code: dialog.code, framework: dialog.framework })}
         />
       )}
       {journey && (

@@ -14,10 +14,34 @@ const RENDERER_URL = IS_DEV
   ? "http://localhost:5173"
   : `file://${path.join(__dirname, "renderer-dist/index.html")}`;
 
-const SETTINGS_PATH = path.join(app.getPath("userData"), "recrd-settings.json");
-const SESSIONS_PATH = path.join(app.getPath("userData"), "recrd-sessions.json");
+const SETTINGS_PATH = path.join(app.getPath("userData"), "harness-settings.json");
+const SESSIONS_PATH = path.join(app.getPath("userData"), "harness-sessions.json");
 const ICON_PATH = path.join(__dirname, "assets", "icon.png");
 const MAX_SESSIONS = 20;
+
+function migrateLegacyUserData() {
+  try {
+    const userData = app.getPath("userData");
+    const legacyDir = path.join(path.dirname(userData), "recrd");
+    const candidates = [
+      { src: path.join(userData, "recrd-settings.json"), dst: SETTINGS_PATH },
+      { src: path.join(legacyDir, "recrd-settings.json"), dst: SETTINGS_PATH },
+      { src: path.join(legacyDir, "harness-settings.json"), dst: SETTINGS_PATH },
+      { src: path.join(userData, "recrd-sessions.json"), dst: SESSIONS_PATH },
+      { src: path.join(legacyDir, "recrd-sessions.json"), dst: SESSIONS_PATH },
+      { src: path.join(legacyDir, "harness-sessions.json"), dst: SESSIONS_PATH }
+    ];
+    fs.mkdirSync(userData, { recursive: true });
+    for (const { src, dst } of candidates) {
+      if (fs.existsSync(dst)) continue;
+      if (!fs.existsSync(src)) continue;
+      fs.copyFileSync(src, dst);
+      console.log("migrated", src, "->", dst);
+    }
+  } catch (err) {
+    console.warn("migrateLegacyUserData:", err?.message || err);
+  }
+}
 
 const VIEWPORTS = {
   desktop: { label: "Desktop", width: 1440, height: 900, mobile: false },
@@ -121,7 +145,7 @@ function createMainWindow() {
     width: 1400,
     height: 900,
     backgroundColor: "#f8f9fa",
-    title: "Recrd",
+    title: "Harness",
     icon,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -738,7 +762,7 @@ function registerIpc() {
 }
 
 async function renderHtmlToPdf(html) {
-  const tmp = path.join(os.tmpdir(), `recrd-walkthrough-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.html`);
+  const tmp = path.join(os.tmpdir(), `harness-walkthrough-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.html`);
   fs.writeFileSync(tmp, html, "utf8");
   const pdfWin = new BrowserWindow({
     show: false,
@@ -1025,9 +1049,10 @@ ${rows}
 
 app.whenReady().then(() => {
   try {
-    app.setName("Recrd");
-    if (process.platform === "linux") app.setAppUserModelId("com.recrd.app");
+    app.setName("Harness");
+    if (process.platform === "linux") app.setAppUserModelId("com.harness.app");
   } catch (_) {}
+  migrateLegacyUserData();
   registerIpc();
   createMainWindow();
   app.on("activate", () => {

@@ -1,7 +1,8 @@
 {
-  "name": "recrd",
-  "version": "0.2.0",
-  "description": "Electron app that records browser interactions and generates Playwright/Cypress/Selenium/custom scripts",
+  "name": "harness",
+  "productName": "Harness",
+  "version": "0.3.0",
+  "description": "Electron app that records browser interactions and emits test scripts (Playwright/Cypress/Selenium/custom) or annotated PDF walkthroughs",
   "main": "main.js",
   "scripts": {
     "dev": "concurrently -k -n vite,electron -c magenta,cyan \"npm:dev:vite\" \"npm:dev:electron\"",

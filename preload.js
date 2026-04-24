@@ -10,7 +10,7 @@ const on = (channel, handler) => {
   return () => ipcRenderer.removeListener(channel, wrapped);
 };
 
-contextBridge.exposeInMainWorld("recrd", {
+contextBridge.exposeInMainWorld("harness", {
   settings: {
     get: () => invoke("settings:get"),
     set: (patch) => invoke("settings:set", patch)

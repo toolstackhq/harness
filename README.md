@@ -1,9 +1,16 @@
-# Recrd — Script Gen
+# Harness — Script & Doc Gen
 
 Electron desktop app that records browser interactions in an embedded
-Chromium session via CDP, then generates Playwright, Cypress, Selenium,
-or custom-template scripts — and can replay the captured steps back
-against the same browser using the CDP protocol directly.
+Chromium session via CDP and emits either:
+- test scripts (Playwright / Cypress / Selenium / custom template), or
+- annotated walkthroughs (HTML / PDF with per-click screenshots and
+  bounding-box callouts).
+
+Steps can be replayed back against the same browser using the CDP
+protocol directly, with visible per-step pass/fail feedback.
+
+The project was previously known as `recrd`. Existing history under
+`~/.config/recrd/` is migrated automatically on first launch.
 
 ## Run
 
@@ -15,9 +22,12 @@ npm test                  # unit tests (node:test)
 npm run dev               # Vite + Electron dev server with hot reload
 ```
 
-Artifacts persist under `~/.config/recrd/`:
-- `recrd-settings.json` — framework + custom mapping + last URL
-- `recrd-sessions.json` — up to 20 saved sessions with steps + generated script
+Artifacts persist under `~/.config/Harness/`:
+- `harness-settings.json` — framework + custom mapping + last URL + viewport
+- `harness-sessions.json` — up to 20 saved sessions with steps + generated script
+
+Legacy files under `~/.config/recrd/` are migrated automatically on
+first launch.
 
 ## Corporate networks / offline installs
 
@@ -56,12 +66,13 @@ traffic flows through the normal system proxy settings.
 
 # Requirements Traceability
 
-## Epic — Script Gen
+## Epic — Harness (Script & Doc Gen)
 
 **Goal:** turn an existing CDP-based test-recording CLI into a polished
-Electron desktop tool that captures browser interactions, emits
-framework-specific scripts, and replays recorded flows with visible
-feedback — all without an external browser process.
+Electron desktop tool that captures browser interactions and emits
+either framework-specific test scripts or annotated PDF walkthroughs,
+with visible replay of recorded flows — all without an external
+browser process.
 
 Acceptance: a user can open the app, pick a framework, record a flow on
 any URL, stop to review, replay with per-step status, generate and save

@@ -140,8 +140,9 @@ a:hover { text-decoration: underline; }
 
 .startup {
   display: flex;
-  justify-content: center;
-  padding: 32px 20px;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
   overflow: auto;
   flex: 1;
 }
@@ -156,51 +157,59 @@ a:hover { text-decoration: underline; }
 .landing-banner {
   background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
   color: white;
-  border-radius: 12px;
-  padding: 24px 28px;
+  border-radius: 10px;
+  padding: 14px 18px;
   box-shadow: var(--shadow-1);
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 .landing-banner__brand {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 14px;
+  gap: 12px;
+  flex-shrink: 0;
 }
 .landing-banner__brand .app-bar__logo {
   background: rgba(255,255,255,0.18);
+  width: 34px;
+  height: 34px;
+  border-radius: 7px;
 }
 .landing-banner__title {
-  font: 500 24px/1.1 var(--font);
-  letter-spacing: -0.3px;
+  font: 500 18px/1.1 var(--font);
+  letter-spacing: -0.2px;
 }
 .landing-banner__tag {
-  font: 400 13px/1.2 var(--font);
-  color: rgba(255,255,255,0.75);
-  margin-top: 4px;
+  font: 400 12px/1.2 var(--font);
+  color: rgba(255,255,255,0.78);
+  margin-top: 2px;
 }
 .landing-banner__body {
-  font: 400 14px/1.55 var(--font);
+  font: 400 13px/1.45 var(--font);
   color: rgba(255,255,255,0.92);
-  max-width: 760px;
+  flex: 1;
+  min-width: 0;
 }
 .landing-banner__body strong { font-weight: 500; color: white; }
 .landing-banner__chips {
   display: flex;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 6px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 .chip {
   display: inline-flex;
   align-items: center;
-  height: 22px;
-  padding: 0 10px;
-  border-radius: 11px;
-  font: 500 11px/1 var(--mono);
-  letter-spacing: 0.3px;
+  height: 20px;
+  padding: 0 8px;
+  border-radius: 10px;
+  font: 500 10px/1 var(--mono);
+  letter-spacing: 0.25px;
   text-transform: uppercase;
   background: rgba(255,255,255,0.15);
   color: white;
+  white-space: nowrap;
 }
 .chip--blue { background: rgba(210,227,252,0.28); }
 .chip--teal { background: rgba(0,121,107,0.35); }

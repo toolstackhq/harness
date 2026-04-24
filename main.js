@@ -19,6 +19,12 @@ const SESSIONS_PATH = path.join(app.getPath("userData"), "recrd-sessions.json");
 const ICON_PATH = path.join(__dirname, "assets", "icon.png");
 const MAX_SESSIONS = 20;
 
+const VIEWPORTS = {
+  desktop: { label: "Desktop", width: 1440, height: 900, mobile: false },
+  tablet: { label: "Tablet", width: 768, height: 1024, mobile: true, ua: "Mozilla/5.0 (iPad; CPU OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1" },
+  mobile: { label: "Mobile", width: 390, height: 844, mobile: true, ua: "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1" }
+};
+
 const state = {
   mainWindow: null,
   browserView: null,
@@ -51,6 +57,7 @@ function writeJson(file, value) {
 function getSettings() {
   const defaults = {
     recordType: "script",
+    viewport: "desktop",
     framework: "playwright",
     customMapping: {
       navigate: "await this.goTo('{url}')",
@@ -240,14 +247,38 @@ function emitToRenderer(channel, payload) {
   state.mainWindow.webContents.send(channel, payload);
 }
 
+async function applyEmulation(wc, viewportKey) {
+  const v = VIEWPORTS[viewportKey] || VIEWPORTS.desktop;
+  const dbg = wc.debugger;
+  try {
+    if (viewportKey === "desktop" || !v.mobile) {
+      await dbg.sendCommand("Emulation.clearDeviceMetricsOverride");
+      await dbg.sendCommand("Emulation.setUserAgentOverride", { userAgent: "" });
+    } else {
+      await dbg.sendCommand("Emulation.setDeviceMetricsOverride", {
+        width: v.width,
+        height: v.height,
+        deviceScaleFactor: 2,
+        mobile: v.mobile
+      });
+      if (v.ua) await dbg.sendCommand("Emulation.setUserAgentOverride", { userAgent: v.ua });
+      await dbg.sendCommand("Emulation.setTouchEmulationEnabled", { enabled: true });
+    }
+  } catch (err) {
+    console.warn("applyEmulation:", err?.message || err);
+  }
+}
+
 async function startRecording(options) {
   const settings = getSettings();
   const url = options?.url || settings.lastUrl || "about:blank";
   const recordType = options?.recordType || settings.recordType || "script";
+  const viewport = options?.viewport || settings.viewport || "desktop";
   setSettings({
     lastUrl: url,
     framework: options?.framework || settings.framework,
-    recordType
+    recordType,
+    viewport
   });
   createBrowserView(url);
   const recorder = new DebuggerRecorder(state.browserView.webContents, {
@@ -263,6 +294,7 @@ async function startRecording(options) {
     name: null,
     framework: options?.framework || settings.framework,
     recordType,
+    viewport,
     url,
     recording: true,
     stopped: false,
@@ -284,8 +316,9 @@ async function startRecording(options) {
   recorder.on("detached", (reason) => emitToRenderer("recorder:detached", { reason }));
   try {
     await recorder.start();
+    await applyEmulation(state.browserView.webContents, viewport);
     emitToRenderer("recorder:started", { url, framework: state.session.framework });
-    return { ok: true, url, framework: state.session.framework };
+    return { ok: true, url, framework: state.session.framework, viewport };
   } catch (err) {
     destroyBrowserView();
     state.recorder = null;
@@ -431,6 +464,34 @@ function registerIpc() {
   ipcMain.handle("recorder:stop", () => pauseRecording());
   ipcMain.handle("recorder:close", () => closeSession());
   ipcMain.handle("recorder:clear", () => clearSteps());
+  ipcMain.handle("recorder:toggle-pause", () => {
+    if (!state.recorder || !state.session) return { ok: false };
+    if (state.recorder.paused) {
+      state.recorder.resume();
+      emitToRenderer("recorder:resumed", {});
+    } else {
+      state.recorder.pause();
+      emitToRenderer("recorder:paused", {});
+    }
+    return { ok: true, paused: state.recorder.paused };
+  });
+  ipcMain.handle("recorder:add-wait", (_e, ms) => {
+    if (!state.recorder || !state.session) return { ok: false, error: "No active session" };
+    const n = Math.max(0, Number(ms) || 0);
+    if (!n) return { ok: false, error: "Enter a positive number of milliseconds" };
+    state.recorder.addWait(n);
+    return { ok: true };
+  });
+  ipcMain.handle("recorder:insert-wait-after", (_e, { number, ms }) => {
+    if (!state.recorder || !state.session) return { ok: false, error: "No active session" };
+    const n = Math.max(0, Number(ms) || 0);
+    if (!n) return { ok: false, error: "Enter a positive number of milliseconds" };
+    const ev = state.recorder.insertWaitAfterNumber(number, n);
+    if (!ev) return { ok: false, error: "Step not found" };
+    const steps = state.recorder.getSteps();
+    emitToRenderer("steps:changed", { steps });
+    return { ok: true, steps };
+  });
   ipcMain.handle("recorder:add-note", async (_e, text) => {
     if (!state.recorder || !state.session) return { ok: false, error: "No active session" };
     const trimmed = String(text || "").trim();
@@ -717,6 +778,7 @@ function describeStep(step) {
   const loc = step.locator || {};
   const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
   if (step.kind === "note") return { action: "Note", target: step.text || "" };
+  if (step.kind === "wait") return { action: "Wait", target: `${Number(step.ms) || 0}ms` };
   if (step.kind === "capture") return { action: "Capture", target: step.text || "(annotated region)" };
   if (step.kind === "assert") {
     const t = step.assertionType || "visible";

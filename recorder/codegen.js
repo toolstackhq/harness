@@ -60,6 +60,18 @@ function normalizeTrace(input) {
         });
         continue;
       }
+      if (event.kind === "wait") {
+        const ms = Math.max(0, Number(event.ms) || 0);
+        if (!ms) continue;
+        normalized.push({
+          kind: "wait",
+          ms,
+          ts: Number(event.ts ?? Date.now()),
+          targetId: event.targetId ?? trace.targetId ?? "",
+          number: event.number
+        });
+        continue;
+      }
       if (event.kind === "capture") {
         normalized.push({
           kind: "capture",
@@ -255,6 +267,10 @@ function renderPlaywright(trace) {
       if (step.text) lines.push(commentLines(`[annotated capture] ${step.text}`));
       continue;
     }
+    if (step.kind === "wait") {
+      lines.push(`    await page.waitForTimeout(${Number(step.ms) || 0});`);
+      continue;
+    }
     if (step.kind === "assert") {
       lines.push(renderPlaywrightAssertion(step));
       continue;
@@ -299,6 +315,10 @@ function renderCypress(trace) {
     }
     if (step.kind === "capture") {
       if (step.text) lines.push(commentLines(`[annotated capture] ${step.text}`));
+      continue;
+    }
+    if (step.kind === "wait") {
+      lines.push(`    cy.wait(${Number(step.ms) || 0});`);
       continue;
     }
     if (step.kind === "assert") {
@@ -356,6 +376,10 @@ function renderSelenium(trace) {
       if (step.text) lines.push(commentLines(`[annotated capture] ${step.text}`));
       continue;
     }
+    if (step.kind === "wait") {
+      lines.push(`    await driver.sleep(${Number(step.ms) || 0});`);
+      continue;
+    }
     if (step.kind === "assert") {
       lines.push(renderSeleniumAssertion(step));
       continue;
@@ -404,7 +428,8 @@ const DEFAULT_CUSTOM_MAPPING = {
   assertHidden: "await this.expectHidden('{selector}')",
   assertText: "await this.expectText('{selector}', '{expected}')",
   assertContains: "await this.expectContains('{selector}', '{expected}')",
-  assertValue: "await this.expectValue('{selector}', '{expected}')"
+  assertValue: "await this.expectValue('{selector}', '{expected}')",
+  wait: "await this.wait({ms})"
 };
 
 function renderCustom(trace, options = {}) {
@@ -427,6 +452,12 @@ function renderCustom(trace, options = {}) {
       if (text) {
         lines.push(`[annotated capture] ${text}`.split("\n").map((l) => `// ${l}`).join("\n"));
       }
+      continue;
+    }
+    if (step.kind === "wait") {
+      const tpl = mapping.wait;
+      if (!tpl) continue;
+      lines.push(interpolate(tpl, { ms: Number(step.ms) || 0 }) + ";");
       continue;
     }
     if (step.kind === "assert") {
@@ -464,7 +495,6 @@ function generateCode(input, options = {}) {
       case "wd":
         return renderSelenium(trace);
       case "custom":
-      case "abstract":
         return renderCustom(trace, options);
       case "all":
         return [

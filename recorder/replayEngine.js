@@ -255,6 +255,8 @@ async function replaySteps(steps, dbg, options = {}) {
         const sel = buildSelector(step);
         if (!sel) throw new Error("No selector");
         await pressKey(dbg, sel, step.key || "Enter");
+      } else if (step.kind === "wait") {
+        await sleep(Math.max(0, Number(step.ms) || 0));
       }
     } catch (err) {
       status = "fail";

@@ -426,6 +426,38 @@ class DebuggerRecorder extends EventEmitter {
     return null;
   }
 
+  addWait(ms) {
+    const targetId = this.traces.size > 0 ? [...this.traces.keys()].pop() : "root";
+    const trace = this._ensureTrace(targetId, {});
+    const event = {
+      kind: "wait",
+      ts: now(),
+      targetId,
+      ms: Math.max(0, Number(ms) || 0)
+    };
+    trace.events.push(event);
+    this._emitStep(event);
+    return event;
+  }
+
+  insertWaitAfterNumber(number, ms) {
+    for (const trace of this.traces.values()) {
+      const idx = trace.events.findIndex((e) => e.number === number);
+      if (idx === -1) continue;
+      this._counter += 1;
+      const event = {
+        kind: "wait",
+        ts: now(),
+        targetId: trace.targetId,
+        ms: Math.max(0, Number(ms) || 0),
+        number: this._counter
+      };
+      trace.events.splice(idx + 1, 0, event);
+      return event;
+    }
+    return null;
+  }
+
   addCapture({ screenshot, rect, text, url }) {
     const targetId = this.traces.size > 0 ? [...this.traces.keys()].pop() : "root";
     const trace = this._ensureTrace(targetId, { url });

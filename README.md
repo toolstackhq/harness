@@ -483,6 +483,51 @@ to iterate on a custom mapping.
 
 ---
 
+### US-28 — Capture-area annotation tool
+
+**Title:** Drag-to-select a region on the live page and annotate
+it, so manual callouts become first-class steps alongside the
+auto-captured ones
+
+**Description:** Doc Gen auto-captures the clicked element on
+every interactive step, but sometimes the user wants to circle an
+*arbitrary* region — a balance row, an error banner, a specific
+text block — and write a sentence about it. This is the manual
+equivalent of "snipping tool" inside the app.
+
+Hijacking the embedded browser's rendering was impossible because
+the `WebContentsView` is a native child view that always sits on
+top of the renderer's HTML. Solution: freeze the page by taking a
+snapshot, hide the view (`setVisible(false)`, reused from the
+script-dialog fix), and put a full-screen HTML overlay with the
+snapshot as background. Selection and annotation happen on pure
+HTML where the renderer is already powerful.
+
+**Acceptance:**
+- New capture step kind with `{screenshot, rect (viewport-%),
+  text}`.
+- Main IPC: `capture:snapshot` (capturePage, returns data URL +
+  current URL); `capture:save` (pushes a capture step).
+- Renderer `CaptureOverlay`: drag to draw a rectangle, popup
+  appears beside it for the caption, Redraw / Save / Cancel
+  controls, Esc cancels. Enforces a 6 px minimum size so stray
+  clicks do not commit an empty rectangle.
+- Browser toolbar gains a **Capture area** button; Ctrl+Shift+S
+  opens the overlay from anywhere in the window. Available in
+  both Script Gen and Doc Gen.
+- StepList renders capture rows on a blue-light card with a
+  camera icon and the caption in place of a selector.
+- Codegen: captures render as `// [annotated capture] …`
+  comments in scripts; HTML/PDF render the full screenshot with
+  an inset rectangle matching the user's selection plus the
+  caption.
+
+**Commits:**
+- `50f90e9` feat(recorder): capture step — annotated rectangle over a page snapshot
+- `57e33f0` feat(ui): Capture area selection tool + annotation popup
+
+---
+
 ### US-27 — Assertions
 
 **Title:** Let the user add `expect(...)` assertions to a recording;

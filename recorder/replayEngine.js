@@ -110,7 +110,23 @@ async function highlight(dbg, selector) {
 
 const HIGHLIGHT_PAUSE_MS = 250;
 
+async function resolveWithRetry(dbg, selector, timeoutMs = 8000) {
+  const start = Date.now();
+  let lastErr = null;
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const found = await evalInPage(dbg, `!!window.__qsDeep(${JSON.stringify(selector)})`);
+      if (found === true) return true;
+    } catch (err) {
+      lastErr = err;
+    }
+    await sleep(250);
+  }
+  return false;
+}
+
 async function clickElement(dbg, selector) {
+  if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Click target not found after retries: ${selector}`);
   if (!(await highlight(dbg, selector))) throw new Error(`Click target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const js = `(() => {
@@ -134,6 +150,7 @@ async function clickElement(dbg, selector) {
 }
 
 async function fillElement(dbg, selector, value) {
+  if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Fill target not found after retries: ${selector}`);
   if (!(await highlight(dbg, selector))) throw new Error(`Fill target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const js = `(() => {
@@ -156,6 +173,7 @@ async function fillElement(dbg, selector, value) {
 }
 
 async function selectOption(dbg, selector, value) {
+  if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Select target not found after retries: ${selector}`);
   if (!(await highlight(dbg, selector))) throw new Error(`Select target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const js = `(() => {
@@ -170,6 +188,7 @@ async function selectOption(dbg, selector, value) {
 }
 
 async function checkElement(dbg, selector, checked) {
+  if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Check target not found after retries: ${selector}`);
   if (!(await highlight(dbg, selector))) throw new Error(`Check target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const js = `(() => {
@@ -184,6 +203,7 @@ async function checkElement(dbg, selector, checked) {
 }
 
 async function pressKey(dbg, selector, key) {
+  if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Press target not found after retries: ${selector}`);
   if (!(await highlight(dbg, selector))) throw new Error(`Press target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const focus = `(() => {
@@ -200,21 +220,55 @@ async function pressKey(dbg, selector, key) {
   await dbg.sendCommand("Input.dispatchKeyEvent", { type: "keyUp", ...k });
 }
 
-function waitForLoadEvent(dbg, timeout = 10000) {
+function waitForNetworkAndLoad(dbg, { timeout = 25000, idleMs = 600, maxInflight = 0 } = {}) {
   return new Promise((resolve) => {
     let done = false;
-    const finish = () => {
+    let loadFired = false;
+    let inflight = 0;
+    let lastActivity = Date.now();
+    const finish = (reason) => {
       if (done) return;
       done = true;
+      clearInterval(poller);
       try { dbg.off("message", listener); } catch (_) {}
-      resolve();
+      resolve(reason);
     };
     const listener = (_event, method) => {
-      if (method === "Page.loadEventFired" || method === "Page.frameStoppedLoading") finish();
+      if (method === "Page.loadEventFired" || method === "Page.frameStoppedLoading") {
+        loadFired = true;
+        lastActivity = Date.now();
+      } else if (method === "Network.requestWillBeSent") {
+        inflight += 1;
+        lastActivity = Date.now();
+      } else if (
+        method === "Network.loadingFinished" ||
+        method === "Network.loadingFailed" ||
+        method === "Network.responseReceived"
+      ) {
+        inflight = Math.max(0, inflight - 1);
+        lastActivity = Date.now();
+      }
     };
     try { dbg.on("message", listener); } catch (_) {}
-    setTimeout(finish, timeout);
+    const poller = setInterval(() => {
+      if (loadFired && inflight <= maxInflight && Date.now() - lastActivity >= idleMs) {
+        finish("idle");
+      }
+    }, 150);
+    setTimeout(() => finish("timeout"), timeout);
   });
+}
+
+async function waitForReady(dbg, timeout = 6000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    try {
+      const state = await evalInPage(dbg, "document.readyState");
+      if (state === "complete") return true;
+    } catch (_) {}
+    await sleep(200);
+  }
+  return false;
 }
 
 async function replaySteps(steps, dbg, options = {}) {
@@ -230,9 +284,10 @@ async function replaySteps(steps, dbg, options = {}) {
     let error = null;
     try {
       if (step.kind === "navigate") {
-        const loadP = waitForLoadEvent(dbg);
+        const loadP = waitForNetworkAndLoad(dbg);
         await dbg.sendCommand("Page.navigate", { url: step.url });
         await loadP;
+        await waitForReady(dbg);
         await injectQsDeep(dbg);
       } else if (step.kind === "click" || step.kind === "submit") {
         const sel = buildSelector(step);

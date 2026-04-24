@@ -409,13 +409,23 @@ function clearSteps() {
 async function runReplay(steps) {
   if (state.replayRunning) return { ok: false, error: "Replay already running" };
   if (!state.browserView) return { ok: false, error: "No browser session" };
-  const dbg = state.browserView.webContents.debugger;
+  const wc = state.browserView.webContents;
+  const dbg = wc.debugger;
   if (!dbg.isAttached()) {
     try { dbg.attach("1.3"); } catch (err) { return { ok: false, error: String(err?.message || err) }; }
   }
   try { await dbg.sendCommand("Page.enable"); } catch (_) {}
   try { await dbg.sendCommand("Runtime.enable"); } catch (_) {}
+  try { await dbg.sendCommand("Network.enable"); } catch (_) {}
   try { await dbg.sendCommand("Page.addScriptToEvaluateOnNewDocument", { source: QS_DEEP }); } catch (_) {}
+  try {
+    await wc.session.clearStorageData({
+      storages: ["cookies", "localstorage", "serviceworkers", "indexdb", "websql", "cachestorage"]
+    });
+    await wc.session.clearCache();
+  } catch (err) {
+    console.warn("replay: clear state failed:", err?.message || err);
+  }
 
   state.replayRunning = true;
   const controller = new AbortController();

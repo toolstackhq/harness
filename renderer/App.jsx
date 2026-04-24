@@ -47,6 +47,15 @@ export default function App() {
     return () => { offPaused(); offResumed(); offStopped(); };
   }, []);
 
+  const anyModalOpen =
+    !!dialog || !!journey || !!detail || noteOpen || assertOpen ||
+    !!editingStep || !!capture || !!waitDialog;
+
+  useEffect(() => {
+    if (!session) return;
+    window.harness.browser.setVisible(!anyModalOpen);
+  }, [anyModalOpen, session]);
+
   useEffect(() => {
     const offClosed = window.harness.recorder.onSessionClosed(() => {
       setSession(null);

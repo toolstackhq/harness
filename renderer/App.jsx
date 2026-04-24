@@ -38,7 +38,10 @@ export default function App() {
   useEffect(() => {
     const offPaused = window.harness.recorder.onPaused(() => setPaused(true));
     const offResumed = window.harness.recorder.onResumed(() => setPaused(false));
-    return () => { offPaused(); offResumed(); };
+    const offStopped = window.harness.recorder.onStopped(() => {
+      setSession((s) => (s ? { ...s, stopped: true } : s));
+    });
+    return () => { offPaused(); offResumed(); offStopped(); };
   }, []);
 
   useEffect(() => {

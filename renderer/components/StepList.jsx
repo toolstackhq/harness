@@ -123,12 +123,57 @@ function Row({ step, live, replayStatus, replayDim, replayError, replayDuration,
   );
 }
 
+function SessionNameField({ value, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+  const inputRef = useRef(null);
+
+  useEffect(() => { setDraft(value || ""); }, [value]);
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+    if (editing) inputRef.current?.select();
+  }, [editing]);
+
+  const commit = () => {
+    const trimmed = draft.trim();
+    if (trimmed !== (value || "").trim()) onChange?.(trimmed);
+    setEditing(false);
+  };
+  const cancel = () => { setDraft(value || ""); setEditing(false); };
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        className="session-name session-name--input"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => { if (e.key === "Enter") commit(); else if (e.key === "Escape") cancel(); }}
+        placeholder="e.g. Checkout flow"
+        maxLength={120}
+      />
+    );
+  }
+  return (
+    <div
+      className={`session-name${value ? "" : " session-name--empty"}`}
+      onClick={() => setEditing(true)}
+      title="Click to rename this session"
+    >
+      {value || "Untitled session"}
+    </div>
+  );
+}
+
 export default function StepList({
   steps,
   recording,
   replayState,
   replayStatuses,
   replaySummary,
+  sessionName,
+  onRenameSession,
   onClear,
   onStop,
   onReplay,
@@ -148,9 +193,12 @@ export default function StepList({
 
   return (
     <div className="side-panel">
-      <div className="side-panel__header">
-        <div className="side-panel__title">Recorded steps</div>
-        <div className="side-panel__count">{steps.length}</div>
+      <div className="side-panel__header side-panel__header--stacked">
+        <SessionNameField value={sessionName} onChange={onRenameSession} />
+        <div className="side-panel__meta">
+          <span className="side-panel__subtitle">Recorded steps</span>
+          <span className="side-panel__count">{steps.length}</span>
+        </div>
       </div>
       {!recording && steps.length > 0 && replayState !== "running" && !replaySummary && (
         <div className="info-banner">Recording stopped. Review steps below.</div>

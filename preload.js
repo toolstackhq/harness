@@ -72,8 +72,10 @@ contextBridge.exposeInMainWorld("recrd", {
     load: () => invoke("sessions:load"),
     delete: (id) => invoke("sessions:delete", id),
     generate: (id) => invoke("sessions:generate", id),
+    rename: (id, name) => invoke("sessions:rename", { id, name }),
     saveFile: (payload) => invoke("sessions:save-file", payload),
-    replay: (id) => invoke("sessions:replay", id)
+    replay: (id) => invoke("sessions:replay", id),
+    setActiveName: (name) => invoke("session:set-name", name)
   },
   openExternal: (url) => invoke("shell:open-external", url)
 });

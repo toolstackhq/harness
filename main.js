@@ -260,6 +260,7 @@ async function startRecording(options) {
   state.session = {
     id: newId(),
     startedAt: Date.now(),
+    name: null,
     framework: options?.framework || settings.framework,
     recordType,
     url,
@@ -299,6 +300,7 @@ function persistCurrentSession({ generatedScript } = {}) {
   const entry = {
     id: state.session.historyId || newId(),
     timestamp: state.session.startedAt || Date.now(),
+    name: state.session.name || null,
     url: state.session.url,
     framework: state.session.framework,
     recordType: state.session.recordType || "script",
@@ -398,6 +400,7 @@ async function startReplayOnlySession({ url, steps, framework }) {
   state.session = {
     id: newId(),
     startedAt: Date.now(),
+    name: null,
     framework,
     url,
     recording: false,
@@ -600,6 +603,21 @@ function registerIpc() {
     if (result.canceled || !result.filePath) return { ok: false };
     fs.writeFileSync(result.filePath, script || "", "utf8");
     return { ok: true, path: result.filePath };
+  });
+  ipcMain.handle("session:set-name", (_e, name) => {
+    if (!state.session) return { ok: false, error: "No active session" };
+    const trimmed = String(name || "").trim().slice(0, 120);
+    state.session.name = trimmed || null;
+    if (state.session.historyId) {
+      updateSession(state.session.historyId, { name: state.session.name });
+    }
+    return { ok: true, name: state.session.name };
+  });
+  ipcMain.handle("sessions:rename", (_e, { id, name }) => {
+    const trimmed = String(name || "").trim().slice(0, 120);
+    const updated = updateSession(id, { name: trimmed || null });
+    if (!updated) return { ok: false, error: "Session not found" };
+    return { ok: true, session: updated };
   });
   ipcMain.handle("sessions:replay", async (_e, id) => {
     const sess = loadSessions().find((s) => s.id === id);

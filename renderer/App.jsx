@@ -60,7 +60,8 @@ export default function App() {
       recordType: recordType || "script",
       url: result.url,
       startedAt: Date.now(),
-      stopped: false
+      stopped: false,
+      name: null
     });
     setInitialSteps([]);
     setSteps([]);
@@ -114,6 +115,11 @@ export default function App() {
       return false;
     }
     return true;
+  };
+
+  const onRenameSession = async (name) => {
+    const result = await window.recrd.sessions.setActiveName(name);
+    if (result?.ok) setSession((s) => s ? { ...s, name: result.name } : s);
   };
 
   const onEditStep = (step) => setEditingStep(step);
@@ -274,6 +280,8 @@ export default function App() {
           onCaptureArea={onCaptureArea}
           onEditStep={onEditStep}
           onDeleteStep={onDeleteStep}
+          sessionName={session.name}
+          onRenameSession={onRenameSession}
           onStepsChange={setSteps}
         />
       ) : (

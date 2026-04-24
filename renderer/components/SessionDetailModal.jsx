@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Close, Copy, Save, Play, Trash, actionIcon } from "./Icons.jsx";
+import React, { useEffect, useRef, useState } from "react";
+import { Close, Copy, Save, Play, Trash, Edit, actionIcon } from "./Icons.jsx";
 
 const CHIP = { playwright: "PW", cypress: "CY", selenium: "SE", custom: "CX" };
 
@@ -59,6 +59,20 @@ export default function SessionDetailModal({ session, onClose, onDelete, onRepla
   const [tab, setTab] = useState("steps");
   const [script, setScript] = useState(session.generatedScript || "");
   const [generating, setGenerating] = useState(false);
+  const [name, setName] = useState(session.name || "");
+  const [editingName, setEditingName] = useState(false);
+  const nameRef = useRef(null);
+
+  useEffect(() => { setName(session.name || ""); }, [session]);
+  useEffect(() => { if (editingName) nameRef.current?.focus(); }, [editingName]);
+
+  const commitName = async () => {
+    setEditingName(false);
+    const trimmed = name.trim();
+    if ((trimmed || null) === (session.name || null)) return;
+    const result = await window.recrd.sessions.rename(session.id, trimmed);
+    if (result?.ok) onUpdate?.(result.session);
+  };
 
   const generate = async () => {
     setGenerating(true);
@@ -92,11 +106,32 @@ export default function SessionDetailModal({ session, onClose, onDelete, onRepla
     <div className="dialog-backdrop" onClick={onClose}>
       <div className="dialog dialog--wide" onClick={(e) => e.stopPropagation()}>
         <div className="dialog__header">
-          <div>
-            <div className="dialog__title" style={{ maxWidth: 520, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {session.url}
-            </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {editingName ? (
+              <input
+                ref={nameRef}
+                className="field__input"
+                style={{ maxWidth: 520, fontWeight: 500, fontSize: 16 }}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => { if (e.key === "Enter") commitName(); else if (e.key === "Escape") { setName(session.name || ""); setEditingName(false); } }}
+                placeholder="e.g. Checkout flow"
+                maxLength={120}
+              />
+            ) : (
+              <div
+                className="dialog__title"
+                style={{ maxWidth: 520, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", cursor: "text" }}
+                onClick={() => setEditingName(true)}
+                title="Click to rename"
+              >
+                {session.name || session.url}
+                <Edit size={14} style={{ marginLeft: 8, opacity: 0.5, verticalAlign: "middle" }} />
+              </div>
+            )}
             <div className="dialog__meta">
+              {session.name && <span style={{ fontFamily: "var(--mono)", fontSize: 11 }}>{session.url}</span>}
               <span>{formatAt(session.timestamp)}</span>
               <span className={`framework-chip framework-chip--${session.framework}`}>{CHIP[session.framework] || "PW"}</span>
               <span>{session.stepCount} {session.stepCount === 1 ? "step" : "steps"}</span>

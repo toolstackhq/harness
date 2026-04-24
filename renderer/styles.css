@@ -432,7 +432,16 @@ a:hover { text-decoration: underline; }
   padding: 14px 16px;
   border-bottom: 1px solid var(--grey-200);
 }
+.side-panel__header--stacked {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
 .side-panel__title { font-size: 14px; font-weight: 500; color: var(--grey-900); }
+.side-panel__subtitle { font-size: 12px; font-weight: 500; color: var(--grey-700); }
+.side-panel__meta {
+  display: flex; align-items: center; justify-content: space-between;
+}
 .side-panel__count {
   font-family: var(--mono);
   font-size: 11px;
@@ -440,6 +449,41 @@ a:hover { text-decoration: underline; }
   border-radius: 10px;
   background: var(--grey-100);
   color: var(--grey-700);
+}
+
+.session-name {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--grey-900);
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border-radius: 4px;
+  cursor: text;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 1px solid transparent;
+}
+.session-name:hover { background: var(--grey-50); border-color: var(--grey-200); }
+.session-name--empty { color: var(--grey-500); font-style: italic; }
+.session-name--input {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--grey-900);
+  padding: 4px 6px;
+  margin: -5px -7px;
+  border: 1px solid var(--blue);
+  border-radius: 4px;
+  outline: none;
+  background: white;
+  width: 100%;
+  box-shadow: 0 0 0 2px rgba(26,115,232,0.2);
+}
+
+.session-row__url-mini {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--grey-600);
 }
 .side-panel__body {
   flex: 1;

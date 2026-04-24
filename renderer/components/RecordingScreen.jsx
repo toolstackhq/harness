@@ -13,6 +13,8 @@ export default function RecordingScreen({
   onCaptureArea,
   onEditStep,
   onDeleteStep,
+  onRenameSession,
+  sessionName,
   onStepsChange
 }) {
   const [url, setUrl] = useState(session.url);
@@ -175,6 +177,8 @@ export default function RecordingScreen({
           canEditSteps
           onEditStep={onEditStep}
           onDeleteStep={onDeleteStep}
+          sessionName={sessionName}
+          onRenameSession={onRenameSession}
         />
       </div>
     </div>

@@ -150,8 +150,9 @@ export default function StartupScreen({ onStart, onOpenSession }) {
                     <div className="session-row" key={s.id} onClick={() => onOpenSession?.(s)}>
                       <div className="session-row__icon"><Globe size={18} /></div>
                       <div className="session-row__body">
-                        <div className="session-row__url">{s.url}</div>
+                        <div className="session-row__url">{s.name || s.url}</div>
                         <div className="session-row__meta">
+                          {s.name && <><span className="session-row__url-mini">{s.url}</span> · </>}
                           {formatAt(s.timestamp)}
                           {s.generatedScript && <> · <span style={{ color: "var(--blue)", fontWeight: 500 }}>script saved</span></>}
                         </div>

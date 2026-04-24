@@ -26,7 +26,10 @@ export default function App() {
   const [capture, setCapture] = useState(null);
   const [waitDialog, setWaitDialog] = useState(null); // null | { mode: "add" } | { mode: "after", step }
   const [paused, setPaused] = useState(false);
+  const [sessionsRefresh, setSessionsRefresh] = useState(0);
   const [busy, setBusy] = useState(false);
+
+  const bumpSessions = () => setSessionsRefresh((k) => k + 1);
 
   useEffect(() => {
     const off = window.harness.recorder.onError(({ message }) => {
@@ -50,6 +53,7 @@ export default function App() {
       setInitialSteps(null);
       setSteps([]);
       setPaused(false);
+      bumpSessions();
     });
     const offReplayLoaded = window.harness.recorder.onReplayLoaded(({ session: replaySession, steps: replaySteps }) => {
       setDetail(null);
@@ -327,6 +331,7 @@ export default function App() {
         <StartupScreen
           onStart={onStart}
           onOpenSession={(s) => setDetail(s)}
+          refreshKey={sessionsRefresh}
         />
       )}
       {dialog && (
@@ -384,9 +389,9 @@ export default function App() {
         <SessionDetailModal
           session={detail}
           onClose={() => setDetail(null)}
-          onDelete={() => setDetail(null)}
+          onDelete={() => { setDetail(null); bumpSessions(); }}
           onReplay={onReplaySession}
-          onUpdate={(updated) => setDetail(updated)}
+          onUpdate={(updated) => { setDetail(updated); bumpSessions(); }}
         />
       )}
       {busy && <div className="dialog-backdrop"><div style={{ color: "white" }}>Starting…</div></div>}

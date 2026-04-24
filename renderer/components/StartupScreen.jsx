@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import FrameworkSelector from "./FrameworkSelector.jsx";
 import RecordTypeSelector from "./RecordTypeSelector.jsx";
 import ViewportSelector from "./ViewportSelector.jsx";
-import { Play, Globe } from "./Icons.jsx";
+import { Play, Globe, Reload } from "./Icons.jsx";
 
 function Chip({ framework }) {
   const label = { playwright: "PW", cypress: "CY", selenium: "SE", custom: "CX" }[framework] || "PW";
@@ -20,7 +20,7 @@ function formatAt(ts) {
   return new Date(ts).toLocaleDateString();
 }
 
-export default function StartupScreen({ onStart, onOpenSession }) {
+export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }) {
   const [recordType, setRecordType] = useState("script");
   const [framework, setFramework] = useState("playwright");
   const [viewport, setViewport] = useState("desktop");
@@ -50,6 +50,8 @@ export default function StartupScreen({ onStart, onOpenSession }) {
     })();
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => { loadSessions(); /* refetch when parent signals a change */ }, [refreshKey]);
 
   const validateMapping = () => {
     if (framework !== "custom") return null;
@@ -146,9 +148,19 @@ export default function StartupScreen({ onStart, onOpenSession }) {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div className="card">
-            <div className="card__header">
-              <div className="card__title">Recent sessions</div>
-              <div className="card__subtitle">Click a session to view steps, replay, or copy the generated script.</div>
+            <div className="card__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div className="card__title">Recent sessions</div>
+                <div className="card__subtitle">Click a session to view steps, replay, or copy the generated script.</div>
+              </div>
+              <button
+                className="btn btn--icon"
+                onClick={loadSessions}
+                title="Refresh list"
+                style={{ marginTop: -4 }}
+              >
+                <Reload size={18} />
+              </button>
             </div>
             <div className="card__body" style={{ padding: 8 }}>
               {sessions.length > 0 && (

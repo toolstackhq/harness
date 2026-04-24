@@ -10,6 +10,7 @@ export default function RecordingScreen({
   onNewSession,
   onAddNote,
   onAddAssertion,
+  onCaptureArea,
   onEditStep,
   onDeleteStep,
   onStepsChange
@@ -148,6 +149,8 @@ export default function RecordingScreen({
         onAddNote={onAddNote}
         canAddAssertion={session.recordType !== "doc"}
         onAddAssertion={onAddAssertion}
+        canCapture={true}
+        onCaptureArea={onCaptureArea}
       />
       <InfoBar
         cdp={recording}

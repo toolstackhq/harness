@@ -5,6 +5,7 @@ function describe(step) {
   const loc = step.locator || {};
   const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
   if (step.kind === "note") return { action: "note", target: (step.text || "").split("\n")[0] };
+  if (step.kind === "capture") return { action: "capture area", target: (step.text || "(annotated region)").split("\n")[0] };
   if (step.kind === "assert") {
     const sel = loc.css || loc.xpath || "";
     const t = step.assertionType || "visible";
@@ -31,12 +32,15 @@ function Row({ step, live, replayStatus, replayDim, replayError, replayDuration,
 
   const isNote = step.kind === "note";
   const isAssert = step.kind === "assert";
+  const isCapture = step.kind === "capture";
+  const isAnnotation = isNote || isCapture;
   const cls = ["step", "step--clickable"];
-  if (replayStatus === "running" && !isNote) cls.push("step--running");
-  else if (replayStatus === "pass" && !isNote) cls.push("step--pass");
+  if (replayStatus === "running" && !isAnnotation) cls.push("step--running");
+  else if (replayStatus === "pass" && !isAnnotation) cls.push("step--pass");
   else if (replayStatus === "fail") cls.push("step--fail");
   else if (live) cls.push("step--live");
   else if (isNote) cls.push("step--note-type");
+  else if (isCapture) cls.push("step--capture-type");
   else if (isAssert) cls.push("step--assert-type");
   else if (hasShadow) cls.push("step--shadow");
   if (replayDim) cls.push("step--dim");
@@ -72,8 +76,8 @@ function Row({ step, live, replayStatus, replayDim, replayError, replayDuration,
             <span className="step__duration">{replayDuration}ms</span>
           )}
         </div>
-        {isNote ? (
-          <div className="step__note-text">{step.text || ""}</div>
+        {isNote || isCapture ? (
+          <div className="step__note-text">{step.text || (isCapture ? "(annotated region)" : "")}</div>
         ) : (
           <div className="step__selector">
             {hasShadow && (

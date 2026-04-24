@@ -9,6 +9,7 @@ import JourneyExportDialog from "./components/JourneyExportDialog.jsx";
 import NoteComposer from "./components/NoteComposer.jsx";
 import StepEditDialog from "./components/StepEditDialog.jsx";
 import AssertionDialog from "./components/AssertionDialog.jsx";
+import CaptureOverlay from "./components/CaptureOverlay.jsx";
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -21,6 +22,7 @@ export default function App() {
   const [noteOpen, setNoteOpen] = useState(false);
   const [assertOpen, setAssertOpen] = useState(false);
   const [editingStep, setEditingStep] = useState(null);
+  const [capture, setCapture] = useState(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -94,6 +96,26 @@ export default function App() {
     return true;
   };
 
+  const onCaptureArea = async () => {
+    if (!session) return;
+    const snap = await window.recrd.capture.snapshot();
+    if (!snap?.ok) { alert(snap?.error || "Could not capture the page."); return; }
+    await window.recrd.browser.setVisible(false);
+    setCapture({ dataUrl: snap.dataUrl, url: snap.url });
+  };
+  const closeCapture = async () => {
+    setCapture(null);
+    if (session) await window.recrd.browser.setVisible(true);
+  };
+  const saveCapture = async ({ screenshot, rect, text, url }) => {
+    const result = await window.recrd.capture.save({ screenshot, rect, text, url });
+    if (!result?.ok) {
+      alert(result?.error || "Failed to save capture.");
+      return false;
+    }
+    return true;
+  };
+
   const onEditStep = (step) => setEditingStep(step);
   const saveStepEdit = async (patch) => {
     if (!editingStep) return false;
@@ -134,6 +156,9 @@ export default function App() {
           e.preventDefault();
           setAssertOpen(true);
         }
+      } else if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "S" || e.key === "s")) {
+        e.preventDefault();
+        onCaptureArea();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -246,6 +271,7 @@ export default function App() {
           onNewSession={onNewSession}
           onAddNote={onAddNote}
           onAddAssertion={onAddAssertion}
+          onCaptureArea={onCaptureArea}
           onEditStep={onEditStep}
           onDeleteStep={onDeleteStep}
           onStepsChange={setSteps}
@@ -290,6 +316,14 @@ export default function App() {
           step={editingStep}
           onSave={saveStepEdit}
           onClose={() => setEditingStep(null)}
+        />
+      )}
+      {capture && (
+        <CaptureOverlay
+          dataUrl={capture.dataUrl}
+          url={capture.url}
+          onSave={saveCapture}
+          onClose={closeCapture}
         />
       )}
       {detail && (

@@ -60,6 +60,19 @@ function normalizeTrace(input) {
         });
         continue;
       }
+      if (event.kind === "capture") {
+        normalized.push({
+          kind: "capture",
+          text: String(event.text ?? "").trim(),
+          rect: event.rect || null,
+          screenshot: event.screenshot,
+          ts: Number(event.ts ?? Date.now()),
+          targetId: event.targetId ?? trace.targetId ?? "",
+          url: String(event.url ?? trace.url ?? "").trim(),
+          number: event.number
+        });
+        continue;
+      }
       if (event.kind === "assert") {
         const selector = String(event.locator?.css ?? event.selector ?? "").trim();
         if (!selector) continue;
@@ -238,6 +251,10 @@ function renderPlaywright(trace) {
       lines.push(commentLines(step.text));
       continue;
     }
+    if (step.kind === "capture") {
+      if (step.text) lines.push(commentLines(`[annotated capture] ${step.text}`));
+      continue;
+    }
     if (step.kind === "assert") {
       lines.push(renderPlaywrightAssertion(step));
       continue;
@@ -278,6 +295,10 @@ function renderCypress(trace) {
   for (const step of trace.events) {
     if (step.kind === "note") {
       lines.push(commentLines(step.text));
+      continue;
+    }
+    if (step.kind === "capture") {
+      if (step.text) lines.push(commentLines(`[annotated capture] ${step.text}`));
       continue;
     }
     if (step.kind === "assert") {
@@ -329,6 +350,10 @@ function renderSelenium(trace) {
   for (const step of trace.events) {
     if (step.kind === "note") {
       lines.push(commentLines(step.text));
+      continue;
+    }
+    if (step.kind === "capture") {
+      if (step.text) lines.push(commentLines(`[annotated capture] ${step.text}`));
       continue;
     }
     if (step.kind === "assert") {
@@ -394,6 +419,13 @@ function renderCustom(trace, options = {}) {
         lines.push(text.split("\n").map((l) => `// ${l}`).join("\n"));
       } else {
         lines.push(interpolate(tpl, { ...customBindings(step), text }));
+      }
+      continue;
+    }
+    if (step.kind === "capture") {
+      const text = String(step.text || "").trim();
+      if (text) {
+        lines.push(`[annotated capture] ${text}`.split("\n").map((l) => `// ${l}`).join("\n"));
       }
       continue;
     }

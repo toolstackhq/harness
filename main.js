@@ -452,6 +452,24 @@ function registerIpc() {
     emitToRenderer("steps:changed", { steps });
     return { ok: true, steps, step: updated };
   });
+  ipcMain.handle("capture:snapshot", async () => {
+    if (!state.browserView) return { ok: false, error: "No browser view" };
+    try {
+      const image = await state.browserView.webContents.capturePage();
+      if (image.isEmpty()) return { ok: false, error: "Empty capture" };
+      const dataUrl = image.resize({ width: 1200 }).toDataURL();
+      return { ok: true, dataUrl, url: state.browserView.webContents.getURL() };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
+  });
+  ipcMain.handle("capture:save", (_e, payload) => {
+    if (!state.recorder || !state.session) return { ok: false, error: "No active session" };
+    const { screenshot, rect, text, url } = payload || {};
+    if (!screenshot || !rect) return { ok: false, error: "Missing screenshot or rect" };
+    state.recorder.addCapture({ screenshot, rect, text, url: url || state.session.url });
+    return { ok: true };
+  });
   ipcMain.handle("recorder:add-assertion", (_e, payload) => {
     if (!state.recorder || !state.session) return { ok: false, error: "No active session" };
     const { selector, assertionType, expected } = payload || {};
@@ -681,6 +699,7 @@ function describeStep(step) {
   const loc = step.locator || {};
   const label = loc.label || loc.name || loc.text || loc.css || step.element?.tag || step.kind;
   if (step.kind === "note") return { action: "Note", target: step.text || "" };
+  if (step.kind === "capture") return { action: "Capture", target: step.text || "(annotated region)" };
   if (step.kind === "assert") {
     const t = step.assertionType || "visible";
     const sel = loc.css || loc.xpath || label;
@@ -721,6 +740,27 @@ function renderJourneyHtml(selection, meta) {
         <div class="body">
           <div class="headline">📝 Note</div>
           <div class="note-text">${textHtml}</div>
+          ${shot}
+        </div>
+      </section>`;
+    }
+    if (step.kind === "capture") {
+      const textHtml = escapeHtml(step.text || "").replace(/\n/g, "<br />");
+      let shot = "";
+      if (step.screenshot) {
+        let overlay = "";
+        if (step.rect) {
+          const { x, y, width, height } = step.rect;
+          overlay = `<div class="bbox" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;width:${width.toFixed(2)}%;height:${height.toFixed(2)}%;"></div>`;
+        }
+        shot = `<figure class="shot"><img src="${step.screenshot}" alt="Captured region" />${overlay}</figure>`;
+      }
+      return `
+      <section class="step step--capture">
+        <div class="num">${num}</div>
+        <div class="body">
+          <div class="headline">📷 Annotated capture</div>
+          ${textHtml ? `<div class="note-text">${textHtml}</div>` : ""}
           ${shot}
         </div>
       </section>`;
@@ -867,6 +907,11 @@ function renderJourneyHtml(selection, meta) {
       border-color: var(--green);
     }
     .step--assert .headline { color: var(--green); }
+    .step--capture {
+      background: var(--blue-light);
+      border-color: var(--blue);
+    }
+    .step--capture .headline { color: var(--blue-dark); }
     .step--note .note-text {
       font-size: 14px;
       color: var(--grey-900);

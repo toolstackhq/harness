@@ -426,6 +426,23 @@ class DebuggerRecorder extends EventEmitter {
     return null;
   }
 
+  addCapture({ screenshot, rect, text, url }) {
+    const targetId = this.traces.size > 0 ? [...this.traces.keys()].pop() : "root";
+    const trace = this._ensureTrace(targetId, { url });
+    const event = {
+      kind: "capture",
+      ts: now(),
+      targetId,
+      text: String(text || "").trim(),
+      rect: rect || null,
+      screenshot: screenshot || null,
+      url: url || ""
+    };
+    trace.events.push(event);
+    this._emitStep(event);
+    return event;
+  }
+
   addAssertion({ selector, assertionType, expected, ts, number: existingNumber }) {
     const targetId = this.traces.size > 0 ? [...this.traces.keys()].pop() : "root";
     const trace = this._ensureTrace(targetId, {});

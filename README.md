@@ -483,6 +483,35 @@ to iterate on a custom mapping.
 
 ---
 
+### US-29 — Named sessions
+
+**Title:** Let users name each recording ("Checkout flow",
+"Admin onboarding") so history is scannable at a glance
+
+**Description:** The session list showed timestamps + URL, which
+is fine for one session but useless once there are a dozen. A
+free-text name becomes the primary identifier everywhere the
+session appears.
+
+**Acceptance:**
+- Side panel shows an editable name at the top — "Untitled
+  session" in grey italic until set; click to edit, Enter
+  commits, Esc reverts.
+- SessionDetailModal title doubles as a rename control; the URL
+  demotes to the meta row.
+- Startup recent list renders the name as the headline with the
+  URL reduced to a mono byline below.
+- Main carries `state.session.name` through start / stop /
+  replay / persist, so the name round-trips through history
+  without extra plumbing.
+- IPC: `session:set-name` for the active session;
+  `sessions:rename(id, name)` for stored entries.
+
+**Commits:**
+- `88b19d5` feat(ui): name your sessions — editable title, persisted to history
+
+---
+
 ### US-28 — Capture-area annotation tool
 
 **Title:** Drag-to-select a region on the live page and annotate

@@ -5,6 +5,7 @@ renderer-dist/
 .env
 .env.*
 .npmrc
-i.png
-2.png
+/*.png
+/*.jpg
+/*.jpeg
 .codex

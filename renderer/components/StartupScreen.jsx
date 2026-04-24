@@ -90,6 +90,32 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
 
   return (
     <div className="startup">
+      <div style={{ maxWidth: 960, width: "100%", margin: "0 auto 24px" }}>
+        <div className="landing-banner">
+          <div className="landing-banner__brand">
+            <div className="app-bar__logo" style={{ width: 40, height: 40, borderRadius: 8 }}>
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="white" aria-hidden="true"><circle cx="12" cy="12" r="5" /></svg>
+            </div>
+            <div>
+              <div className="landing-banner__title">Harness</div>
+              <div className="landing-banner__tag">Record. Replay. Ship scripts or docs.</div>
+            </div>
+          </div>
+          <div className="landing-banner__body">
+            Record a user flow once in an embedded Chromium session.
+            Export it as a <strong>Playwright / Cypress / Selenium</strong> script
+            with your own template, or an <strong>annotated PDF walkthrough</strong>
+            with per-click screenshots. Replay any saved session against the
+            live page with per-step pass/fail feedback.
+          </div>
+          <div className="landing-banner__chips">
+            <span className="chip chip--blue">Script Gen</span>
+            <span className="chip chip--teal">Doc Gen</span>
+            <span className="chip chip--green">CDP Replay</span>
+            <span className="chip chip--orange">Shadow DOM</span>
+          </div>
+        </div>
+      </div>
       <div className="startup__grid">
         <div>
           <div className="card">

@@ -11,6 +11,7 @@ import StepEditDialog from "./components/StepEditDialog.jsx";
 import AssertionDialog from "./components/AssertionDialog.jsx";
 import CaptureOverlay from "./components/CaptureOverlay.jsx";
 import WaitDialog from "./components/WaitDialog.jsx";
+import AboutDialog from "./components/AboutDialog.jsx";
 
 export default function App() {
   const [session, setSession] = useState(null);
@@ -27,6 +28,7 @@ export default function App() {
   const [waitDialog, setWaitDialog] = useState(null); // null | { mode: "add" } | { mode: "after", step }
   const [paused, setPaused] = useState(false);
   const [sessionsRefresh, setSessionsRefresh] = useState(0);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const bumpSessions = () => setSessionsRefresh((k) => k + 1);
@@ -49,7 +51,7 @@ export default function App() {
 
   const anyModalOpen =
     !!dialog || !!journey || !!detail || noteOpen || assertOpen ||
-    !!editingStep || !!capture || !!waitDialog;
+    !!editingStep || !!capture || !!waitDialog || aboutOpen;
 
   useEffect(() => {
     if (!session) return;
@@ -314,6 +316,7 @@ export default function App() {
               }
             : null
         }
+        onHelp={() => setAboutOpen(true)}
       />
       <Breadcrumb items={breadcrumb} />
       {session ? (
@@ -394,6 +397,7 @@ export default function App() {
           onClose={() => setWaitDialog(null)}
         />
       )}
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
       {detail && (
         <SessionDetailModal
           session={detail}

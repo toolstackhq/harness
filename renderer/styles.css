@@ -153,6 +153,60 @@ a:hover { text-decoration: underline; }
   width: 100%;
 }
 
+.landing-banner {
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-dark) 100%);
+  color: white;
+  border-radius: 12px;
+  padding: 24px 28px;
+  box-shadow: var(--shadow-1);
+}
+.landing-banner__brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.landing-banner__brand .app-bar__logo {
+  background: rgba(255,255,255,0.18);
+}
+.landing-banner__title {
+  font: 500 24px/1.1 var(--font);
+  letter-spacing: -0.3px;
+}
+.landing-banner__tag {
+  font: 400 13px/1.2 var(--font);
+  color: rgba(255,255,255,0.75);
+  margin-top: 4px;
+}
+.landing-banner__body {
+  font: 400 14px/1.55 var(--font);
+  color: rgba(255,255,255,0.92);
+  max-width: 760px;
+}
+.landing-banner__body strong { font-weight: 500; color: white; }
+.landing-banner__chips {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 11px;
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: rgba(255,255,255,0.15);
+  color: white;
+}
+.chip--blue { background: rgba(210,227,252,0.28); }
+.chip--teal { background: rgba(0,121,107,0.35); }
+.chip--green { background: rgba(19,115,51,0.4); }
+.chip--orange { background: rgba(176,96,0,0.4); }
+
 .card {
   background: var(--white);
   border: 1px solid var(--grey-300);

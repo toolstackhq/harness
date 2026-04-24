@@ -1,5 +1,5 @@
 import React from "react";
-import { Logo, Play, Code, Save } from "./Icons.jsx";
+import { Logo, Play, Code, Save, Help } from "./Icons.jsx";
 
 function ActionButton({ action, variant }) {
   if (!action) return null;
@@ -14,7 +14,7 @@ function ActionButton({ action, variant }) {
   );
 }
 
-export default function AppBar({ section, primary, secondary }) {
+export default function AppBar({ section, primary, secondary, onHelp }) {
   return (
     <div className="app-bar">
       <div className="app-bar__logo"><Logo size={16} /></div>
@@ -25,7 +25,14 @@ export default function AppBar({ section, primary, secondary }) {
       <div className="app-bar__spacer" />
       <ActionButton action={secondary} variant="secondary" />
       <ActionButton action={primary} variant="primary" />
-      <div className="app-bar__avatar">S</div>
+      <button
+        className="btn btn--icon"
+        onClick={onHelp}
+        title="About Harness and keyboard shortcuts"
+        style={{ marginLeft: 4 }}
+      >
+        <Help size={20} />
+      </button>
     </div>
   );
 }

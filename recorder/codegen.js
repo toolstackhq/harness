@@ -232,6 +232,35 @@ function commentLines(text, indent = "    ") {
   return String(text || "").split("\n").map((line) => `${indent}// ${line}`).join("\n");
 }
 
+function toConstName(base, used) {
+  let id = String(base || "VALUE")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
+  if (!id) id = "VALUE";
+  if (!/^[A-Z_]/.test(id)) id = `V_${id}`;
+  let candidate = id;
+  let n = 2;
+  while (used.has(candidate)) candidate = `${id}_${n++}`;
+  used.add(candidate);
+  return candidate;
+}
+
+function extractInputVariables(trace) {
+  const used = new Set();
+  const byIndex = new Map();
+  const declarations = [];
+  trace.events.forEach((step, idx) => {
+    if (step.kind !== "fill" && step.kind !== "select") return;
+    const loc = step.locator || {};
+    const base = loc.label || loc.name || loc.ariaLabel || loc.placeholder || loc.id || loc.css || step.kind;
+    const name = toConstName(base, used);
+    byIndex.set(idx, name);
+    declarations.push({ name, value: String(step.value ?? "") });
+  });
+  return { byIndex, declarations };
+}
+
 function renderPlaywrightAssertion(step) {
   const loc = step.locator || {};
   const base = renderPlaywrightLocator(loc);
@@ -248,17 +277,25 @@ function renderPlaywrightAssertion(step) {
 
 function renderPlaywright(trace) {
   const hasAsserts = trace.events.some((s) => s.kind === "assert");
+  const { byIndex, declarations } = extractInputVariables(trace);
   const lines = [
     hasAsserts
       ? `import { chromium, expect } from "@playwright/test";`
       : `import { chromium } from "playwright";`,
-    "",
+    ""
+  ];
+  if (declarations.length) {
+    lines.push("// Edit these to parameterise the flow.");
+    for (const d of declarations) lines.push(`const ${d.name} = ${escapeString(d.value)};`);
+    lines.push("");
+  }
+  lines.push(
     "(async () => {",
     "  const browser = await chromium.launch({ headless: false });",
     "  const page = await browser.newPage();",
     "  try {"
-  ];
-  for (const step of trace.events) {
+  );
+  for (const [i, step] of trace.events.entries()) {
     if (step.kind === "note") {
       lines.push(commentLines(step.text));
       continue;
@@ -281,9 +318,10 @@ function renderPlaywright(trace) {
     }
     const loc = step.locator || {};
     const l = renderPlaywrightLocator(loc);
+    const varName = byIndex.get(i);
     if (step.kind === "click") lines.push(`    await ${l}.click();`);
-    else if (step.kind === "fill") lines.push(`    await ${l}.fill(${escapeString(step.value ?? "")});`);
-    else if (step.kind === "select") lines.push(`    await ${l}.selectOption(${escapeString(step.value ?? "")});`);
+    else if (step.kind === "fill") lines.push(`    await ${l}.fill(${varName || escapeString(step.value ?? "")});`);
+    else if (step.kind === "select") lines.push(`    await ${l}.selectOption(${varName || escapeString(step.value ?? "")});`);
     else if (step.kind === "check") lines.push(`    await ${l}.${step.checked ? "check" : "uncheck"}();`);
     else if (step.kind === "press") lines.push(`    await ${l}.press(${escapeString(step.key || "Enter")});`);
     else if (step.kind === "submit") lines.push(`    await ${l}.click();`);
@@ -307,8 +345,15 @@ function renderCypressAssertion(step) {
 }
 
 function renderCypress(trace) {
-  const lines = [`describe(${escapeString(trace.title || "recorded flow")}, () => {`, `  it('replays the flow', () => {`];
-  for (const step of trace.events) {
+  const { byIndex, declarations } = extractInputVariables(trace);
+  const lines = [];
+  if (declarations.length) {
+    lines.push("// Edit these to parameterise the flow.");
+    for (const d of declarations) lines.push(`const ${d.name} = ${escapeString(d.value)};`);
+    lines.push("");
+  }
+  lines.push(`describe(${escapeString(trace.title || "recorded flow")}, () => {`, `  it('replays the flow', () => {`);
+  for (const [i, step] of trace.events.entries()) {
     if (step.kind === "note") {
       lines.push(commentLines(step.text));
       continue;
@@ -331,9 +376,10 @@ function renderCypress(trace) {
     }
     const loc = step.locator || {};
     const l = renderCypressLocator(loc);
+    const varName = byIndex.get(i);
     if (step.kind === "click") lines.push(`    ${l}.click();`);
-    else if (step.kind === "fill") lines.push(`    ${l}.clear().type(${escapeString(step.value ?? "")});`);
-    else if (step.kind === "select") lines.push(`    ${l}.select(${escapeString(step.value ?? "")});`);
+    else if (step.kind === "fill") lines.push(`    ${l}.clear().type(${varName || escapeString(step.value ?? "")});`);
+    else if (step.kind === "select") lines.push(`    ${l}.select(${varName || escapeString(step.value ?? "")});`);
     else if (step.kind === "check") lines.push(`    ${l}.${step.checked ? "check" : "uncheck"}();`);
     else if (step.kind === "press") lines.push(`    ${l}.type(${escapeString(`{${(step.key || "enter").toLowerCase()}}`)});`);
     else if (step.kind === "submit") lines.push(`    ${l}.click();`);
@@ -360,14 +406,22 @@ function renderSeleniumAssertion(step) {
 }
 
 function renderSelenium(trace) {
+  const { byIndex, declarations } = extractInputVariables(trace);
   const lines = [
     'import { Builder, By, Key } from "selenium-webdriver";',
-    "",
+    ""
+  ];
+  if (declarations.length) {
+    lines.push("// Edit these to parameterise the flow.");
+    for (const d of declarations) lines.push(`const ${d.name} = ${escapeString(d.value)};`);
+    lines.push("");
+  }
+  lines.push(
     "(async () => {",
     "  const driver = await new Builder().forBrowser('chrome').build();",
     "  try {"
-  ];
-  for (const step of trace.events) {
+  );
+  for (const [i, step] of trace.events.entries()) {
     if (step.kind === "note") {
       lines.push(commentLines(step.text));
       continue;
@@ -397,12 +451,13 @@ function renderSelenium(trace) {
     } else {
       ref = `driver.findElement(${sel.expr})`;
     }
+    const varName = byIndex.get(i);
     if (step.kind === "click") lines.push(`    await ${ref}.click();`);
     else if (step.kind === "fill") {
       lines.push(`    await ${ref}.clear();`);
-      lines.push(`    await ${ref}.sendKeys(${escapeString(step.value ?? "")});`);
+      lines.push(`    await ${ref}.sendKeys(${varName || escapeString(step.value ?? "")});`);
     } else if (step.kind === "select") {
-      lines.push(`    await ${ref}.sendKeys(${escapeString(step.value ?? "")});`);
+      lines.push(`    await ${ref}.sendKeys(${varName || escapeString(step.value ?? "")});`);
     } else if (step.kind === "check") {
       lines.push(`    await ${ref}.click();`);
     } else if (step.kind === "press") {

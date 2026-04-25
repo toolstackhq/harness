@@ -157,10 +157,13 @@ function createMainWindow() {
   win.loadURL(RENDERER_URL);
   if (IS_DEV) win.webContents.openDevTools({ mode: "detach" });
   win.on("resize", () => repositionBrowser());
+  win.on("close", async (e) => {
+    if (_quitting) return;
+    e.preventDefault();
+    await gracefulShutdown();
+    try { win.destroy(); } catch (_) {}
+  });
   win.on("closed", () => {
-    if (state.browserView) {
-      try { destroyBrowserView(); } catch {}
-    }
     state.mainWindow = null;
   });
   state.mainWindow = win;
@@ -557,6 +560,39 @@ function registerIpc() {
       if (image.isEmpty()) return { ok: false, error: "Empty capture" };
       const dataUrl = image.resize({ width: 1200 }).toDataURL();
       return { ok: true, dataUrl, url: state.browserView.webContents.getURL() };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
+  });
+  ipcMain.handle("inspector:highlight", async (_e, selector) => {
+    if (!state.browserView) return { ok: false, error: "No browser session" };
+    const dbg = state.browserView.webContents.debugger;
+    if (!dbg.isAttached()) {
+      try { dbg.attach("1.3"); } catch (err) { return { ok: false, error: String(err?.message || err) }; }
+    }
+    try { await dbg.sendCommand("Runtime.enable"); } catch (_) {}
+    try { await dbg.sendCommand("Runtime.evaluate", { expression: QS_DEEP, awaitPromise: false }); } catch (_) {}
+    const sel = String(selector || "").trim();
+    if (!sel) return { ok: false, error: "Selector required" };
+    const expr = `(() => {
+      try {
+        const matches = window.__qsDeepAll(${JSON.stringify(sel)});
+        if (matches.length > 0) window.__harnessHighlight(matches[0]);
+        return { count: matches.length };
+      } catch (err) { return { count: 0, error: String(err && err.message || err) }; }
+    })()`;
+    try {
+      const res = await dbg.sendCommand("Runtime.evaluate", {
+        expression: expr,
+        returnByValue: true,
+        awaitPromise: false
+      });
+      if (res?.exceptionDetails) {
+        return { ok: false, error: res.exceptionDetails.exception?.description || "Selector failed" };
+      }
+      const value = res?.result?.value || { count: 0 };
+      if (value.error) return { ok: false, error: value.error };
+      return { ok: true, count: value.count || 0 };
     } catch (err) {
       return { ok: false, error: String(err?.message || err) };
     }
@@ -1150,6 +1186,40 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
+});
+
+let _quitting = false;
+
+async function gracefulShutdown() {
+  if (_quitting) return;
+  _quitting = true;
+  if (state.replayAbort) {
+    try { state.replayAbort.abort(); } catch (_) {}
+    state.replayAbort = null;
+  }
+  state.replayRunning = false;
+  if (state.recorder) {
+    try { state.recorder.removeAllListeners(); } catch (_) {}
+    try { await state.recorder.stop(); } catch (_) {}
+    state.recorder = null;
+  }
+  if (state.browserView) {
+    try {
+      const wc = state.browserView.webContents;
+      if (wc && !wc.isDestroyed() && wc.debugger && wc.debugger.isAttached()) {
+        try { wc.debugger.detach(); } catch (_) {}
+      }
+    } catch (_) {}
+    try { destroyBrowserView(); } catch (_) {}
+  }
+  state.session = null;
+}
+
+app.on("before-quit", async (e) => {
+  if (_quitting) return;
+  e.preventDefault();
+  await gracefulShutdown();
+  app.exit(0);
 });
 
 app.on("window-all-closed", () => {

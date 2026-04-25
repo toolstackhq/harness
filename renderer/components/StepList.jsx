@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
-import { actionIcon, Check, Close, Spinner, Play, More, Edit, Trash, Clock } from "./Icons.jsx";
+import { actionIcon, Check, Close, Spinner, Play, More, Edit, Trash, Clock, Search } from "./Icons.jsx";
+import InspectorPanel from "./InspectorPanel.jsx";
 
 function describe(step) {
   const loc = step.locator || {};
@@ -197,6 +198,7 @@ export default function StepList({
   const liveIndex = recording ? steps.length - 1 : -1;
   const isReplaying = replayState === "running";
   const canReplay = !recording && steps.length > 0 && replayState !== "running";
+  const [inspectorOpen, setInspectorOpen] = useState(false);
 
   return (
     <div className="side-panel">
@@ -204,9 +206,20 @@ export default function StepList({
         <SessionNameField value={sessionName} onChange={onRenameSession} />
         <div className="side-panel__meta">
           <span className="side-panel__subtitle">Recorded steps</span>
-          <span className="side-panel__count">{steps.length}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <button
+              className="btn btn--icon"
+              style={{ width: 24, height: 24 }}
+              onClick={() => setInspectorOpen((v) => !v)}
+              title="Toggle inspector"
+            >
+              <Search size={14} />
+            </button>
+            <span className="side-panel__count">{steps.length}</span>
+          </div>
         </div>
       </div>
+      {inspectorOpen && <InspectorPanel onClose={() => setInspectorOpen(false)} />}
       {!recording && steps.length > 0 && replayState !== "running" && !replaySummary && (
         <div className="info-banner">Recording stopped. Review steps below.</div>
       )}

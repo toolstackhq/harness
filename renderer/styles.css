@@ -548,6 +548,74 @@ a:hover { text-decoration: underline; }
   font-size: 11px;
   color: var(--grey-600);
 }
+
+.inspector {
+  border-bottom: 1px solid var(--grey-200);
+  background: var(--grey-50);
+}
+.inspector__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--grey-200);
+}
+.inspector__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 12px/1 var(--font);
+  color: var(--grey-800);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.inspector__x {
+  width: 22px; height: 22px;
+  border: none; background: transparent;
+  color: var(--grey-600); cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.inspector__x:hover { background: var(--grey-200); }
+.inspector__body { padding: 10px 14px 12px; }
+.inspector__input {
+  width: 100%;
+  border: 1px solid var(--grey-400);
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  background: white;
+  resize: vertical;
+  outline: none;
+}
+.inspector__input:focus { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+.inspector__row {
+  display: flex; align-items: center; gap: 10px;
+  margin-top: 8px;
+}
+.inspector__result {
+  font: 500 12px/1 var(--mono);
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: var(--grey-100);
+  color: var(--grey-700);
+}
+.inspector__result--hit { background: var(--green-bg); color: var(--green); }
+.inspector__result--miss { background: var(--orange-bg); color: var(--orange); }
+.inspector__result--err { background: var(--red-bg); color: var(--red); max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inspector__hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--grey-600);
+}
+.inspector__hint code {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--grey-200);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
 .side-panel__body {
   flex: 1;
   overflow-y: auto;

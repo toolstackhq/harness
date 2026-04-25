@@ -73,6 +73,9 @@ contextBridge.exposeInMainWorld("harness", {
     snapshot: () => invoke("capture:snapshot"),
     save: (payload) => invoke("capture:save", payload)
   },
+  inspector: {
+    highlight: (selector) => invoke("inspector:highlight", selector)
+  },
   sessions: {
     load: () => invoke("sessions:load"),
     delete: (id) => invoke("sessions:delete", id),

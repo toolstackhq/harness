@@ -30,6 +30,44 @@ const QS_DEEP = `
       setTimeout(() => { try { box.remove(); } catch (_) {} }, 900);
     } catch (_) {}
   };
+  if (!window.__qsDeepAll) {
+    window.__qsDeepAll = function(selector) {
+      const out = [];
+      if (!selector) return out;
+      const parts = String(selector).split(" >> ").map((s) => s.trim()).filter(Boolean);
+      if (parts.length > 1) {
+        let ctx = document;
+        for (let i = 0; i < parts.length - 1; i += 1) {
+          const host = ctx.querySelector(parts[i]);
+          if (!host || !host.shadowRoot) return out;
+          ctx = host.shadowRoot;
+        }
+        try { return Array.from(ctx.querySelectorAll(parts[parts.length - 1])); } catch (_) { return out; }
+      }
+      try {
+        const direct = document.querySelectorAll(selector);
+        for (const el of direct) out.push(el);
+      } catch (_) {}
+      const queue = [document];
+      const seen = new Set();
+      while (queue.length) {
+        const root = queue.shift();
+        if (seen.has(root)) continue;
+        seen.add(root);
+        const all = root.querySelectorAll ? root.querySelectorAll("*") : [];
+        for (const el of all) {
+          if (el.shadowRoot) {
+            queue.push(el.shadowRoot);
+            try {
+              const matches = el.shadowRoot.querySelectorAll(selector);
+              for (const m of matches) if (!out.includes(m)) out.push(m);
+            } catch (_) {}
+          }
+        }
+      }
+      return out;
+    };
+  }
   if (window.__qsDeep) return;
   window.__qsDeep = function(selector) {
     if (!selector) return null;

@@ -40,6 +40,7 @@ export const Camera = (p) => <I {...p} d="M20 5h-3.17l-1.24-1.35A2 2 0 0 0 14.12
 export const Pause = (p) => <I {...p} d="M6 5h4v14H6zm8 0h4v14h-4z" />;
 export const Clock = (p) => <I {...p} d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8zm1-13h-2v6l5.2 3.2 1-1.6-4.2-2.6z" />;
 export const Help = (p) => <I {...p} d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 17h-2v-2h2v2zm2.07-7.75-.9.92A3.4 3.4 0 0 0 13 14.5h-2v-.5a4 4 0 0 1 1.17-2.83l1.24-1.26A2 2 0 0 0 14 8.5a2 2 0 0 0-4 0H8a4 4 0 0 1 8 0 3.18 3.18 0 0 1-.93 2.25z" />;
+export const Search = (p) => <I {...p} d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 5 1.49-1.49zM10 14a4 4 0 1 1 0-8 4 4 0 0 1 0 8z" />;
 
 export const Spinner = ({ size = 16 }) => (
   <span

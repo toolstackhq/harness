@@ -301,6 +301,11 @@ function createRecorderScript(options = {}) {
     }, true);
 
     const notifyNavigation = () => {
+      // Only the top frame reports navigations. Ad / analytics iframes fire
+      // their own pushState + load events and would flood the trace with
+      // tracker URLs (demdex, doubleclick, etc.) that are not meaningful
+      // user navigations and cannot be replayed from the top frame.
+      if (window !== window.top) return;
       send({
         kind: "navigate",
         url: location.href,

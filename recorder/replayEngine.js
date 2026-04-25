@@ -284,11 +284,21 @@ async function replaySteps(steps, dbg, options = {}) {
     let error = null;
     try {
       if (step.kind === "navigate") {
-        const loadP = waitForNetworkAndLoad(dbg);
-        await dbg.sendCommand("Page.navigate", { url: step.url });
-        await loadP;
-        await waitForReady(dbg);
-        await injectQsDeep(dbg);
+        let currentUrl = "";
+        try { currentUrl = await evalInPage(dbg, "location.href"); } catch (_) {}
+        if (currentUrl && currentUrl === step.url) {
+          // Already on the target page (e.g. the initial navigate duplicates
+          // the session.url we already loaded). Just ensure the document is
+          // ready and skip the re-navigate.
+          await waitForReady(dbg);
+          await injectQsDeep(dbg);
+        } else {
+          const loadP = waitForNetworkAndLoad(dbg);
+          await dbg.sendCommand("Page.navigate", { url: step.url });
+          await loadP;
+          await waitForReady(dbg);
+          await injectQsDeep(dbg);
+        }
       } else if (step.kind === "click" || step.kind === "submit") {
         const sel = buildSelector(step);
         if (!sel) throw new Error("No selector");

@@ -16,6 +16,7 @@ export default function BrowserToolbar({
   onReload,
   startedAt,
   recording,
+  replaying,
   onNewSession,
   onAddNote,
   canAddNote,
@@ -27,6 +28,7 @@ export default function BrowserToolbar({
   onTogglePause,
   onAddWait
 }) {
+  const canNavigate = !replaying;
   const [value, setValue] = useState(url || "");
   const [elapsed, setElapsed] = useState(0);
 
@@ -41,7 +43,7 @@ export default function BrowserToolbar({
 
   const submit = (e) => {
     e.preventDefault();
-    if (!recording) return;
+    if (!canNavigate) return;
     let target = value.trim();
     if (!target) return;
     if (!/^(https?:|about:|file:)/i.test(target)) target = `https://${target}`;
@@ -50,9 +52,9 @@ export default function BrowserToolbar({
 
   return (
     <div className="browser-toolbar">
-      <button className="btn btn--icon" onClick={onBack} title="Back" disabled={!recording}><Back /></button>
-      <button className="btn btn--icon" onClick={onForward} title="Forward" disabled={!recording}><Forward /></button>
-      <button className="btn btn--icon" onClick={onReload} title="Reload" disabled={!recording}><Reload /></button>
+      <button className="btn btn--icon" onClick={onBack} title="Back" disabled={!canNavigate}><Back /></button>
+      <button className="btn btn--icon" onClick={onForward} title="Forward" disabled={!canNavigate}><Forward /></button>
+      <button className="btn btn--icon" onClick={onReload} title="Reload" disabled={!canNavigate}><Reload /></button>
       <form onSubmit={submit} style={{ flex: 1, display: "flex" }}>
         <input
           className="url-bar"
@@ -60,7 +62,8 @@ export default function BrowserToolbar({
           onChange={(e) => setValue(e.target.value)}
           spellCheck={false}
           placeholder="Enter URL"
-          disabled={!recording}
+          disabled={!canNavigate}
+          title={!canNavigate ? "Disabled during replay" : ""}
         />
       </form>
       {canAddNote && (

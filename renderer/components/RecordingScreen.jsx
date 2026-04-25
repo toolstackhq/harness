@@ -146,6 +146,7 @@ export default function RecordingScreen({
         url={url}
         startedAt={session.startedAt}
         recording={recording}
+        replaying={replayState === "running"}
         onNavigate={(u) => window.harness.browser.navigate(u)}
         onBack={() => window.harness.browser.back()}
         onForward={() => window.harness.browser.forward()}

@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Close, Save, actionIcon } from "./Icons.jsx";
 import { encodeWalkthroughVideo } from "../lib/encodeWalkthroughVideo.js";
+import { encodeWalkthroughMp4 } from "../lib/encodeWalkthroughMp4.js";
+import { isMp4Supported } from "../lib/renderWalkthroughFrames.js";
 
 function describe(step) {
   const loc = step.locator || {};
@@ -42,15 +44,19 @@ export default function JourneyExportDialog({ steps, onClose, defaultFormat = "h
   const allOff = () => setSelected(new Set());
 
   const [progress, setProgress] = useState(null); // { i, total } | null
+  const [mp4Available, setMp4Available] = useState(false);
+
+  useEffect(() => { isMp4Supported().then(setMp4Available); }, []);
 
   const doExport = async () => {
     setBusy(true);
     setProgress(null);
     try {
       const indices = [...selected].sort((a, b) => a - b);
-      if (format === "webm") {
+      if (format === "webm" || format === "mp4") {
         const filteredSteps = indices.map((i) => steps[i]).filter(Boolean);
-        const bytes = await encodeWalkthroughVideo(filteredSteps, {
+        const encoder = format === "mp4" ? encodeWalkthroughMp4 : encodeWalkthroughVideo;
+        const bytes = await encoder(filteredSteps, {
           fps: 4,
           holdMs: 2000,
           onProgress: (i, total) => setProgress({ i, total })
@@ -58,7 +64,7 @@ export default function JourneyExportDialog({ steps, onClose, defaultFormat = "h
         const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
         const result = await window.harness.journey.saveVideo({
           bytes,
-          defaultName: `walkthrough-${stamp}.webm`
+          defaultName: `walkthrough-${stamp}.${format}`
         });
         if (result?.ok) onClose?.();
         else if (result?.error) alert(result.error);
@@ -113,8 +119,16 @@ export default function JourneyExportDialog({ steps, onClose, defaultFormat = "h
             <button
               className={`seg__btn${format === "webm" ? " seg__btn--active" : ""}`}
               onClick={() => setFormat("webm")}
-              title="Stitched video — 2s per step, with bbox overlays. Encoded in-app via MediaRecorder, no ffmpeg."
+              title="Stitched video — encoded via MediaRecorder, plays in browsers / VLC."
             >WebM</button>
+            <button
+              className={`seg__btn${format === "mp4" ? " seg__btn--active" : ""}`}
+              onClick={() => mp4Available && setFormat("mp4")}
+              disabled={!mp4Available}
+              title={mp4Available
+                ? "Stitched video as MP4 (H.264) — broader compatibility (PowerPoint, Outlook, Confluence)."
+                : "MP4 encoding (H.264) not supported on this system. Use WebM instead."}
+            >MP4</button>
           </div>
         </div>
         <div className="dialog__body journey-body">

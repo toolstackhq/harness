@@ -802,10 +802,15 @@ function registerIpc() {
 
   ipcMain.handle("walkthrough:save-video", async (_e, { bytes, defaultName }) => {
     if (!bytes || !bytes.length) return { ok: false, error: "Empty video" };
+    const isMp4 = /\.mp4$/i.test(defaultName || "");
     const result = await dialog.showSaveDialog(state.mainWindow, {
       title: "Save walkthrough video",
       defaultPath: defaultName || "walkthrough.webm",
-      filters: [{ name: "WebM video", extensions: ["webm"] }]
+      filters: [
+        isMp4
+          ? { name: "MP4 video", extensions: ["mp4"] }
+          : { name: "WebM video", extensions: ["webm"] }
+      ]
     });
     if (result.canceled || !result.filePath) return { ok: false };
     const buf = Buffer.from(bytes.buffer || bytes);

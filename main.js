@@ -528,6 +528,14 @@ async function runReplay(steps) {
   } catch (err) {
     console.warn("replay: clear state failed:", err?.message || err);
   }
+  // Reset DOM to about:blank AFTER clearing storage so the first recorded
+  // navigate lands on a genuinely clean slate (no leftover cookies, no
+  // in-memory page state). Mimics what the user gets opening an incognito
+  // tab and typing the URL fresh.
+  try {
+    await wc.loadURL("about:blank");
+    await new Promise((r) => setTimeout(r, 150));
+  } catch (_) {}
 
   state.replayRunning = true;
   const controller = new AbortController();
@@ -557,7 +565,11 @@ async function runReplay(steps) {
 
 async function startReplayOnlySession({ url, steps, framework }) {
   await closeSession();
-  createBrowserView(url);
+  // Create the view at about:blank — runReplay below will clear state and
+  // perform the first navigation to the recorded URL itself, so the page
+  // loads against a fresh slate instead of inheriting whatever cookies
+  // happened to be on disk from a prior session.
+  createBrowserView("about:blank");
   const settings = getSettings();
   const recorder = new DebuggerRecorder(state.browserView.webContents, {
     target: framework,
@@ -581,14 +593,9 @@ async function startReplayOnlySession({ url, steps, framework }) {
     session: { ...state.session },
     steps
   });
-  await new Promise((resolve) => {
-    const wc = state.browserView.webContents;
-    let done = false;
-    const finish = () => { if (!done) { done = true; resolve(); } };
-    wc.once("did-finish-load", finish);
-    wc.once("did-fail-load", finish);
-    setTimeout(finish, 12000);
-  });
+  // Small settle so the about:blank document is ready before runReplay
+  // starts hammering the debugger.
+  await new Promise((r) => setTimeout(r, 200));
   return runReplay(steps);
 }
 

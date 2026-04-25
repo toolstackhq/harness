@@ -8,4 +8,9 @@ renderer-dist/
 /*.png
 /*.jpg
 /*.jpeg
+/*.webm
+/*.mp4
+/*.html
+/*.md
+!/README.md
 .codex

@@ -1095,6 +1095,34 @@ a:hover { text-decoration: underline; }
 .seg__btn + .seg__btn { border-left: 1px solid var(--grey-300); }
 .seg__btn:hover { background: var(--grey-50); }
 .seg__btn--active { background: var(--blue-light); color: var(--blue-dark); }
+.seg__btn:disabled { color: var(--grey-400); cursor: not-allowed; background: var(--grey-50); }
+
+.export-caveats {
+  background: var(--grey-50);
+  border-bottom: 1px solid var(--grey-200);
+  padding: 10px 20px;
+  font-size: 12px;
+  color: var(--grey-700);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.export-caveats__row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+.export-caveats__label {
+  font-weight: 500;
+  color: var(--grey-800);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 10px;
+  width: 64px;
+  flex-shrink: 0;
+}
+.export-caveats__row--warn { color: var(--orange); }
+.export-caveats__row--warn .export-caveats__label { color: var(--orange); }
 .journey-body {
   background: white;
   max-height: 55vh;

@@ -131,6 +131,34 @@ export default function JourneyExportDialog({ steps, onClose, defaultFormat = "h
             >MP4</button>
           </div>
         </div>
+        {(format === "webm" || format === "mp4") && (() => {
+          const stepsSelected = selected.size;
+          const seconds = stepsSelected * 2 + 1;
+          const sizeMB = (stepsSelected * 0.6).toFixed(1);
+          const minutes = Math.floor(seconds / 60);
+          const remSec = seconds % 60;
+          const duration = minutes > 0 ? `${minutes}m ${remSec}s` : `${remSec}s`;
+          return (
+            <div className="export-caveats">
+              <div className="export-caveats__row">
+                <span className="export-caveats__label">Estimate</span>
+                <span>~{sizeMB} MB · {duration} · {stepsSelected} step{stepsSelected === 1 ? "" : "s"} × 2s hold</span>
+              </div>
+              {format === "mp4" && (
+                <div className="export-caveats__row">
+                  <span className="export-caveats__label">Caveat</span>
+                  <span>H.264 encode runs in your Chromium — speed and codec availability depend on this machine. If MP4 fails, retry with WebM.</span>
+                </div>
+              )}
+              {stepsSelected > 60 && (
+                <div className="export-caveats__row export-caveats__row--warn">
+                  <span className="export-caveats__label">Heads-up</span>
+                  <span>Long flow — file may exceed 30 MB and encoding can take a couple of minutes. The Export button shows progress; safe to wait.</span>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         <div className="dialog__body journey-body">
           {steps.length === 0 ? (
             <div className="empty-tab">No steps to export.</div>

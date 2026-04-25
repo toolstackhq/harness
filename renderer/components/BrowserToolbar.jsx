@@ -141,7 +141,7 @@ export default function BrowserToolbar({
         </div>
       )}
       {(inspectMode || !recording) && (
-        <button className="new-session-btn" onClick={onNewSession}>← New Session</button>
+        <button className="new-session-btn" onClick={onNewSession}>← Back</button>
       )}
     </div>
   );

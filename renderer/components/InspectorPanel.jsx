@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Close, Search } from "./Icons.jsx";
 
 export default function InspectorPanel({ onClose, fullHeight = false }) {
@@ -6,22 +6,30 @@ export default function InspectorPanel({ onClose, fullHeight = false }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // { count, error }
 
-  const inspect = async () => {
-    const s = selector.trim();
-    if (!s || busy) return;
+  const inspectExpr = async (expr) => {
+    const s = expr.trim();
+    if (!s) return;
     setBusy(true);
     setResult(null);
     try {
       const res = await window.harness.inspector.highlight(s);
-      if (!res?.ok) {
-        setResult({ count: 0, error: res?.error || "Selector failed" });
-      } else {
-        setResult({ count: res.count });
-      }
+      if (!res?.ok) setResult({ count: 0, error: res?.error || "Selector failed" });
+      else setResult({ count: res.count });
     } finally {
       setBusy(false);
     }
   };
+
+  const inspect = () => inspectExpr(selector);
+
+  useEffect(() => {
+    const off = window.harness.inspector.onPicked(({ selector: picked }) => {
+      if (!picked) return;
+      setSelector(picked);
+      inspectExpr(picked);
+    });
+    return () => off();
+  }, []);
 
   const onKey = (e) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -58,7 +66,11 @@ export default function InspectorPanel({ onClose, fullHeight = false }) {
             </div>
           )}
         </div>
-        <div className="inspector__hint">Use <code>{`>>`}</code> for shadow DOM, e.g. <code>my-host {`>>`} #inner</code></div>
+        <div className="inspector__hint">
+          Use <code>{`>>`}</code> for shadow DOM, e.g. <code>my-host {`>>`} #inner</code>.
+          <br />
+          <strong>Right-click any element</strong> in the page to pick its selector automatically.
+        </div>
       </div>
     </div>
   );

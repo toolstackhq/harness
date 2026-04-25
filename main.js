@@ -9,6 +9,53 @@ const { DebuggerRecorder } = require("./recorder/recorder.js");
 const { generateCode } = require("./recorder/codegen.js");
 const { replaySteps, QS_DEEP } = require("./recorder/replayEngine.js");
 
+const PICKER_SCRIPT = `
+(() => {
+  if (window.__harnessPickerInstalled) return;
+  window.__harnessPickerInstalled = true;
+  const cssEsc = (v) => (window.CSS && window.CSS.escape) ? window.CSS.escape(v) : String(v).replace(/[^a-zA-Z0-9_-]/g, "\\\\$&");
+  function leaf(el) {
+    if (!el || !el.tagName) return "";
+    const tid = el.getAttribute && (el.getAttribute("data-testid") || el.getAttribute("data-cy") || el.getAttribute("data-pw"));
+    if (tid) return '[data-testid="' + tid.replace(/"/g, '\\\\"') + '"]';
+    if (el.id) return "#" + cssEsc(el.id);
+    const name = el.getAttribute && el.getAttribute("name");
+    if (name) return '[name="' + name.replace(/"/g, '\\\\"') + '"]';
+    const aria = el.getAttribute && el.getAttribute("aria-label");
+    if (aria) return '[aria-label="' + aria.replace(/"/g, '\\\\"') + '"]';
+    const tag = el.tagName.toLowerCase();
+    if (el.parentElement) {
+      const sibs = Array.from(el.parentElement.children).filter(s => s.tagName === el.tagName);
+      const idx = sibs.indexOf(el) + 1;
+      return tag + ":nth-of-type(" + idx + ")";
+    }
+    return tag;
+  }
+  function pickSelector(el) {
+    const chain = [];
+    let node = el;
+    while (node) {
+      const root = node.getRootNode && node.getRootNode();
+      if (root && root.host) { chain.unshift(leaf(root.host)); node = root.host; }
+      else break;
+    }
+    const tail = leaf(el);
+    return chain.length ? chain.concat([tail]).join(" >> ") : tail;
+  }
+  document.addEventListener("contextmenu", (e) => {
+    const path = typeof e.composedPath === "function" ? e.composedPath() : [e.target];
+    const target = path.find((n) => n instanceof Element);
+    if (!target) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const fn = globalThis.__harnessPick;
+      if (typeof fn === "function") fn(JSON.stringify({ selector: pickSelector(target) }));
+    } catch (_) {}
+  }, true);
+})();
+`;
+
 const IS_DEV = process.env.NODE_ENV === "development";
 const RENDERER_URL = IS_DEV
   ? "http://localhost:5173"
@@ -322,6 +369,20 @@ async function startInspect(options) {
     await dbg.sendCommand("Page.enable");
     await dbg.sendCommand("Runtime.enable");
     await dbg.sendCommand("Page.addScriptToEvaluateOnNewDocument", { source: QS_DEEP });
+    await dbg.sendCommand("Page.addScriptToEvaluateOnNewDocument", { source: PICKER_SCRIPT });
+    await dbg.sendCommand("Runtime.evaluate", { expression: PICKER_SCRIPT, awaitPromise: false });
+    await dbg.sendCommand("Runtime.addBinding", { name: "__harnessPick" });
+    if (state.inspectMessageHandler) {
+      try { dbg.off("message", state.inspectMessageHandler); } catch (_) {}
+    }
+    state.inspectMessageHandler = (_event, method, params) => {
+      if (method !== "Runtime.bindingCalled" || params?.name !== "__harnessPick") return;
+      try {
+        const data = JSON.parse(params.payload);
+        if (data?.selector) emitToRenderer("inspector:picked", { selector: data.selector });
+      } catch (_) {}
+    };
+    dbg.on("message", state.inspectMessageHandler);
     await applyEmulation(state.browserView.webContents, viewport);
   } catch (err) {
     console.warn("startInspect: setup failed:", err?.message || err);
@@ -429,6 +490,10 @@ async function closeSession() {
   if (state.recorder) {
     try { await state.recorder.stop(); } catch (_) {}
   }
+  if (state.inspectMessageHandler && state.browserView) {
+    try { state.browserView.webContents.debugger.off("message", state.inspectMessageHandler); } catch (_) {}
+  }
+  state.inspectMessageHandler = null;
   state.recorder = null;
   destroyBrowserView();
   state.session = null;

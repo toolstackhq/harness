@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld("harness", {
   journey: {
     getSteps: () => invoke("journey:get-steps"),
     export: (payload) => invoke("journey:export", payload),
+    saveVideo: (payload) => invoke("walkthrough:save-video", payload),
     onScreenshot: (handler) => on("step:screenshot", handler)
   },
   capture: {

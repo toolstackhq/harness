@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Close, Save, actionIcon } from "./Icons.jsx";
+import { encodeWalkthroughVideo } from "../lib/encodeWalkthroughVideo.js";
 
 function describe(step) {
   const loc = step.locator || {};
@@ -40,15 +41,37 @@ export default function JourneyExportDialog({ steps, onClose, defaultFormat = "h
   const allOn = () => setSelected(new Set(steps.map((_, i) => i)));
   const allOff = () => setSelected(new Set());
 
+  const [progress, setProgress] = useState(null); // { i, total } | null
+
   const doExport = async () => {
     setBusy(true);
+    setProgress(null);
     try {
       const indices = [...selected].sort((a, b) => a - b);
+      if (format === "webm") {
+        const filteredSteps = indices.map((i) => steps[i]).filter(Boolean);
+        const bytes = await encodeWalkthroughVideo(filteredSteps, {
+          fps: 4,
+          holdMs: 2000,
+          onProgress: (i, total) => setProgress({ i, total })
+        });
+        const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+        const result = await window.harness.journey.saveVideo({
+          bytes,
+          defaultName: `walkthrough-${stamp}.webm`
+        });
+        if (result?.ok) onClose?.();
+        else if (result?.error) alert(result.error);
+        return;
+      }
       const result = await window.harness.journey.export({ indices, format, callouts });
       if (result?.ok) onClose?.();
       else if (result && result.error) alert(result.error);
+    } catch (err) {
+      alert(`Export failed: ${err?.message || err}`);
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -87,6 +110,11 @@ export default function JourneyExportDialog({ steps, onClose, defaultFormat = "h
               onClick={() => setFormat("md")}
               title="Single .md file with screenshots embedded as base64"
             >MD</button>
+            <button
+              className={`seg__btn${format === "webm" ? " seg__btn--active" : ""}`}
+              onClick={() => setFormat("webm")}
+              title="Stitched video — 2s per step, with bbox overlays. Encoded in-app via MediaRecorder, no ffmpeg."
+            >WebM</button>
           </div>
         </div>
         <div className="dialog__body journey-body">
@@ -122,7 +150,12 @@ export default function JourneyExportDialog({ steps, onClose, defaultFormat = "h
         <div className="dialog__footer">
           <button className="btn btn--secondary" onClick={onClose}>Cancel</button>
           <button className="btn btn--primary" onClick={doExport} disabled={busy || selected.size === 0}>
-            <Save size={16} /> {busy ? "Exporting…" : `Export ${format.toUpperCase()}`}
+            <Save size={16} />
+            {busy
+              ? (progress
+                  ? `Encoding ${progress.i}/${progress.total}…`
+                  : "Exporting…")
+              : `Export ${format.toUpperCase()}`}
           </button>
         </div>
       </div>

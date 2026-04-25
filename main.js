@@ -800,6 +800,19 @@ function registerIpc() {
     return { ok: true };
   });
 
+  ipcMain.handle("walkthrough:save-video", async (_e, { bytes, defaultName }) => {
+    if (!bytes || !bytes.length) return { ok: false, error: "Empty video" };
+    const result = await dialog.showSaveDialog(state.mainWindow, {
+      title: "Save walkthrough video",
+      defaultPath: defaultName || "walkthrough.webm",
+      filters: [{ name: "WebM video", extensions: ["webm"] }]
+    });
+    if (result.canceled || !result.filePath) return { ok: false };
+    const buf = Buffer.from(bytes.buffer || bytes);
+    fs.writeFileSync(result.filePath, buf);
+    return { ok: true, path: result.filePath };
+  });
+
   ipcMain.handle("replay:start", async () => {
     if (!state.recorder) return { ok: false, error: "No active session" };
     const steps = state.recorder.getSteps();

@@ -3,6 +3,7 @@ import AppBar from "./components/AppBar.jsx";
 import Breadcrumb from "./components/Breadcrumb.jsx";
 import StartupScreen from "./components/StartupScreen.jsx";
 import RecordingScreen from "./components/RecordingScreen.jsx";
+import InspectScreen from "./components/InspectScreen.jsx";
 import ScriptDialog from "./components/ScriptDialog.jsx";
 import SessionDetailModal from "./components/SessionDetailModal.jsx";
 import JourneyExportDialog from "./components/JourneyExportDialog.jsx";
@@ -80,7 +81,7 @@ export default function App() {
     const result = await window.harness.recorder.start({ recordType, framework, viewport, url });
     setBusy(false);
     if (!result.ok) {
-      alert(`Failed to start recording: ${result.error}`);
+      alert(`Failed to start ${recordType === "inspect" ? "inspect" : "recording"}: ${result.error}`);
       return;
     }
     setSession({
@@ -274,11 +275,14 @@ export default function App() {
     : null;
   const homeTitle = canLeave ? "Back to sessions" : "Stop recording to leave";
 
+  const sessionLabel = session?.recordType === "inspect"
+    ? "Inspecting"
+    : session?.stopped ? "Review" : "Recording";
   const breadcrumb = session
     ? [
         { label: "Harness", onClick: goHome, title: homeTitle },
         { label: "Sessions", onClick: goHome, title: homeTitle },
-        { label: session.stopped ? "Review" : "Recording" }
+        { label: sessionLabel }
       ]
     : [
         { label: "Harness" },
@@ -289,9 +293,9 @@ export default function App() {
   return (
     <div className="app">
       <AppBar
-        section={session ? (session.stopped ? "Review" : "Recording") : "New session"}
+        section={session ? sessionLabel : "New session"}
         primary={
-          session
+          session && session.recordType !== "inspect"
             ? {
                 label: session.recordType === "doc" ? "Export walkthrough" : "Generate Script",
                 icon: session.recordType === "doc" ? "save" : "code",
@@ -304,7 +308,7 @@ export default function App() {
             : null
         }
         secondary={
-          session && session.recordType !== "doc"
+          session && session.recordType !== "doc" && session.recordType !== "inspect"
             ? {
                 label: "Export Journey",
                 icon: "save",
@@ -320,25 +324,33 @@ export default function App() {
       />
       <Breadcrumb items={breadcrumb} />
       {session ? (
-        <RecordingScreen
-          key={session.id || session.url}
-          session={session}
-          initialSteps={initialSteps}
-          autoReplay={autoReplay}
-          onNewSession={onNewSession}
-          onAddNote={onAddNote}
-          onAddAssertion={onAddAssertion}
-          onCaptureArea={onCaptureArea}
-          onEditStep={onEditStep}
-          onDeleteStep={onDeleteStep}
-          onInsertWaitAfter={onInsertWaitAfter}
-          onAddWait={onAddWait}
-          onTogglePause={onTogglePause}
-          paused={paused}
-          sessionName={session.name}
-          onRenameSession={onRenameSession}
-          onStepsChange={setSteps}
-        />
+        session.recordType === "inspect" ? (
+          <InspectScreen
+            key={session.id || session.url}
+            session={session}
+            onNewSession={onNewSession}
+          />
+        ) : (
+          <RecordingScreen
+            key={session.id || session.url}
+            session={session}
+            initialSteps={initialSteps}
+            autoReplay={autoReplay}
+            onNewSession={onNewSession}
+            onAddNote={onAddNote}
+            onAddAssertion={onAddAssertion}
+            onCaptureArea={onCaptureArea}
+            onEditStep={onEditStep}
+            onDeleteStep={onDeleteStep}
+            onInsertWaitAfter={onInsertWaitAfter}
+            onAddWait={onAddWait}
+            onTogglePause={onTogglePause}
+            paused={paused}
+            sessionName={session.name}
+            onRenameSession={onRenameSession}
+            onStepsChange={setSteps}
+          />
+        )
       ) : (
         <StartupScreen
           onStart={onStart}

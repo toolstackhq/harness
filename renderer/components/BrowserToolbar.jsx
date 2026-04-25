@@ -17,6 +17,7 @@ export default function BrowserToolbar({
   startedAt,
   recording,
   replaying,
+  inspectMode,
   onNewSession,
   onAddNote,
   canAddNote,
@@ -116,7 +117,12 @@ export default function BrowserToolbar({
           {paused ? <Play size={14} /> : <Pause size={14} />} {paused ? "Resume" : "Pause"}
         </button>
       )}
-      {recording ? (
+      {inspectMode ? (
+        <div className="stopped-chip" style={{ background: "var(--blue-light)", color: "var(--blue-dark)", borderColor: "var(--blue)" }}>
+          <span className="stopped-chip__dot" style={{ background: "var(--blue)" }} />
+          INSPECT
+        </div>
+      ) : recording ? (
         paused ? (
           <div className="stopped-chip" style={{ background: "var(--orange-bg)", color: "var(--orange)", borderColor: "var(--orange)" }}>
             <span className="stopped-chip__dot" style={{ background: "var(--orange)" }} />
@@ -134,7 +140,7 @@ export default function BrowserToolbar({
           Stopped
         </div>
       )}
-      {!recording && (
+      {(inspectMode || !recording) && (
         <button className="new-session-btn" onClick={onNewSession}>← New Session</button>
       )}
     </div>

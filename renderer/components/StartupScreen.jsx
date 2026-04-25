@@ -145,6 +145,13 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
                   <FrameworkSelector value={framework} onChange={setFramework} />
                 </div>
               )}
+              {recordType === "inspect" && (
+                <div className="field">
+                  <div className="field__help" style={{ background: "var(--blue-light)", color: "var(--blue-dark)", padding: "10px 12px", borderRadius: 4, lineHeight: 1.5 }}>
+                    Inspect mode opens the URL in an embedded browser with a permanent selector inspector. Nothing is recorded; closing the session leaves no history entry.
+                  </div>
+                </div>
+              )}
               {recordType === "script" && framework === "custom" && (
                 <div className="field">
                   <label className="field__label">Custom action mapping (JSON)</label>
@@ -163,7 +170,7 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
             <div className="card__action">
               <button className="btn btn--primary" onClick={onStartClick} disabled={loading || !url}>
                 <Play size={18} />
-                Start Recording
+                {recordType === "inspect" ? "Start Inspecting" : "Start Recording"}
               </button>
             </div>
           </div>

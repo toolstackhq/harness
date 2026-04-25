@@ -296,6 +296,40 @@ async function applyEmulation(wc, viewportKey) {
   }
 }
 
+async function startInspect(options) {
+  const settings = getSettings();
+  const url = options?.url || settings.lastUrl || "about:blank";
+  const viewport = options?.viewport || settings.viewport || "desktop";
+  setSettings({ lastUrl: url, viewport, recordType: "inspect" });
+  createBrowserView(url);
+  state.recorder = null;
+  state.session = {
+    id: newId(),
+    startedAt: Date.now(),
+    name: null,
+    framework: null,
+    recordType: "inspect",
+    viewport,
+    url,
+    recording: false,
+    stopped: false,
+    historyId: null,
+    inspectOnly: true
+  };
+  try {
+    const dbg = state.browserView.webContents.debugger;
+    if (!dbg.isAttached()) dbg.attach("1.3");
+    await dbg.sendCommand("Page.enable");
+    await dbg.sendCommand("Runtime.enable");
+    await dbg.sendCommand("Page.addScriptToEvaluateOnNewDocument", { source: QS_DEEP });
+    await applyEmulation(state.browserView.webContents, viewport);
+  } catch (err) {
+    console.warn("startInspect: setup failed:", err?.message || err);
+  }
+  emitToRenderer("recorder:started", { url, framework: null, viewport, recordType: "inspect" });
+  return { ok: true, url, viewport, recordType: "inspect", framework: null };
+}
+
 async function startRecording(options) {
   const settings = getSettings();
   const url = options?.url || settings.lastUrl || "about:blank";
@@ -497,7 +531,10 @@ function registerIpc() {
   ipcMain.handle("settings:get", () => getSettings());
   ipcMain.handle("settings:set", (_e, patch) => setSettings(patch || {}));
 
-  ipcMain.handle("recorder:start", (_e, options) => startRecording(options || {}));
+  ipcMain.handle("recorder:start", (_e, options) => {
+    if (options?.recordType === "inspect") return startInspect(options || {});
+    return startRecording(options || {});
+  });
   ipcMain.handle("recorder:stop", () => pauseRecording());
   ipcMain.handle("recorder:close", () => closeSession());
   ipcMain.handle("recorder:clear", () => clearSteps());

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Close, Search } from "./Icons.jsx";
 
-export default function InspectorPanel({ onClose }) {
+export default function InspectorPanel({ onClose, fullHeight = false }) {
   const [selector, setSelector] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // { count, error }
@@ -31,10 +31,12 @@ export default function InspectorPanel({ onClose }) {
   };
 
   return (
-    <div className="inspector">
+    <div className={`inspector${fullHeight ? " inspector--full" : ""}`}>
       <div className="inspector__header">
         <span className="inspector__title"><Search size={14} /> Inspector</span>
-        <button className="inspector__x" onClick={onClose} title="Close inspector"><Close size={14} /></button>
+        {onClose && (
+          <button className="inspector__x" onClick={onClose} title="Close inspector"><Close size={14} /></button>
+        )}
       </div>
       <div className="inspector__body">
         <textarea

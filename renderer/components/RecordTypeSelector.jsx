@@ -3,15 +3,21 @@ import React from "react";
 const TYPES = [
   {
     id: "script",
-    label: "Script Gen",
+    label: "Record · Script",
     desc: "Emit Playwright / Cypress / Selenium / Custom code. Captures logic; one screenshot per page visit.",
     badge: "CODE"
   },
   {
     id: "doc",
-    label: "Doc Gen",
+    label: "Record · Doc",
     desc: "Annotated screenshot per click plus a PDF walkthrough. Captures visuals; for onboarding docs and user guides.",
     badge: "PDF"
+  },
+  {
+    id: "inspect",
+    label: "Inspect",
+    desc: "Test selectors against a live page. CSS or shadow-pierce syntax. No recording, no script — just a live highlight.",
+    badge: "INS"
   }
 ];
 

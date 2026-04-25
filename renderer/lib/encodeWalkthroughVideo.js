@@ -22,34 +22,54 @@ export async function encodeWalkthroughVideo(steps, { fps = 4, holdMs = 2000, on
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
+  // Chromium's canvas.captureStream() only emits frames when the canvas is
+  // attached to the document. Off-DOM canvases produce empty streams, so
+  // park it offscreen for the duration of the encode.
+  canvas.style.cssText = "position:fixed;left:-99999px;top:0;pointer-events:none;opacity:0;z-index:-1;";
+  document.body.appendChild(canvas);
   const ctx = canvas.getContext("2d");
   ctx.fillStyle = "#202124";
   ctx.fillRect(0, 0, w, h);
 
-  const stream = canvas.captureStream(fps);
-  const recorder = new MediaRecorder(stream, {
-    mimeType: pickMime(),
-    videoBitsPerSecond: 2_500_000
-  });
-  const chunks = [];
-  recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
-  const stopped = new Promise((resolve) => { recorder.onstop = resolve; });
-  recorder.start(250);
+  try {
+    const stream = canvas.captureStream(0); // manual frame pacing via requestFrame()
+    const track = stream.getVideoTracks()[0];
+    const recorder = new MediaRecorder(stream, {
+      mimeType: pickMime(),
+      videoBitsPerSecond: 2_500_000
+    });
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    const stopped = new Promise((resolve) => { recorder.onstop = resolve; });
+    recorder.start(250);
 
-  for (let i = 0; i < steps.length; i++) {
-    onProgress?.(i, steps.length);
-    await renderStepFrame(ctx, steps[i], i, steps.length, w, h);
-    await sleep(holdMs);
+    const framesPerStep = Math.max(1, Math.round((holdMs / 1000) * fps));
+    const frameInterval = Math.round(1000 / fps);
+
+    for (let i = 0; i < steps.length; i++) {
+      onProgress?.(i, steps.length);
+      await renderStepFrame(ctx, steps[i], i, steps.length, w, h);
+      // Drive the captureStream manually so each rendered frame becomes a
+      // recorded frame (rather than relying on auto-pacing, which Chromium
+      // sometimes drops for off-screen canvases).
+      for (let f = 0; f < framesPerStep; f++) {
+        if (typeof track.requestFrame === "function") track.requestFrame();
+        await sleep(frameInterval);
+      }
+    }
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, w, h);
+    if (typeof track.requestFrame === "function") track.requestFrame();
+    await sleep(400);
+
+    recorder.stop();
+    stream.getTracks().forEach((t) => t.stop());
+    await stopped;
+    onProgress?.(steps.length, steps.length);
+
+    const blob = new Blob(chunks, { type: "video/webm" });
+    return new Uint8Array(await blob.arrayBuffer());
+  } finally {
+    try { canvas.remove(); } catch (_) {}
   }
-  ctx.fillStyle = "rgba(0,0,0,0.7)";
-  ctx.fillRect(0, 0, w, h);
-  await sleep(400);
-
-  recorder.stop();
-  stream.getTracks().forEach((t) => t.stop());
-  await stopped;
-  onProgress?.(steps.length, steps.length);
-
-  const blob = new Blob(chunks, { type: "video/webm" });
-  return new Uint8Array(await blob.arrayBuffer());
 }

@@ -322,20 +322,29 @@ async function replaySteps(steps, dbg, options = {}) {
     let error = null;
     try {
       if (step.kind === "navigate") {
-        let currentUrl = "";
-        try { currentUrl = await evalInPage(dbg, "location.href"); } catch (_) {}
-        if (currentUrl && currentUrl === step.url) {
-          // Already on the target page (e.g. the initial navigate duplicates
-          // the session.url we already loaded). Just ensure the document is
-          // ready and skip the re-navigate.
-          await waitForReady(dbg);
-          await injectQsDeep(dbg);
+        // If the next step is also a navigate, this one is almost certainly
+        // a transient redirect-chain hop (tracker pixel, OAuth bounce, etc.)
+        // whose URL is now stale. Skip it — the next navigate is the real
+        // destination. Saves the 25-second timeout per stale URL.
+        const next = steps[i + 1];
+        if (next && next.kind === "navigate") {
+          // no-op — results in a "pass" entry below
         } else {
-          const loadP = waitForNetworkAndLoad(dbg);
-          await dbg.sendCommand("Page.navigate", { url: step.url });
-          await loadP;
-          await waitForReady(dbg);
-          await injectQsDeep(dbg);
+          let currentUrl = "";
+          try { currentUrl = await evalInPage(dbg, "location.href"); } catch (_) {}
+          if (currentUrl && currentUrl === step.url) {
+            // Already on the target page (e.g. the initial navigate duplicates
+            // the session.url we already loaded). Just ensure the document is
+            // ready and skip the re-navigate.
+            await waitForReady(dbg);
+            await injectQsDeep(dbg);
+          } else {
+            const loadP = waitForNetworkAndLoad(dbg);
+            await dbg.sendCommand("Page.navigate", { url: step.url });
+            await loadP;
+            await waitForReady(dbg);
+            await injectQsDeep(dbg);
+          }
         }
       } else if (step.kind === "click" || step.kind === "submit") {
         const sel = buildSelector(step);

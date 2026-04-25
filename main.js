@@ -737,22 +737,28 @@ function registerIpc() {
       url: state.session?.url || "",
       framework: state.session?.framework || "",
       startedAt: state.session?.startedAt || Date.now(),
-      title: title || state.session?.url || "User journey",
+      title: title || state.session?.name || state.session?.url || "User journey",
       callouts: callouts !== false
     };
-    const html = renderJourneyHtml(steps, meta);
     const stamp = new Date(meta.startedAt).toISOString().replace(/[:.]/g, "-").slice(0, 19);
-    const fmt = format === "pdf" ? "pdf" : "html";
-    const ext = fmt;
+    const fmt = format === "pdf" ? "pdf" : format === "md" ? "md" : "html";
     const filter = fmt === "pdf"
       ? { name: "PDF", extensions: ["pdf"] }
-      : { name: "HTML", extensions: ["html", "htm"] };
+      : fmt === "md"
+        ? { name: "Markdown", extensions: ["md", "markdown"] }
+        : { name: "HTML", extensions: ["html", "htm"] };
     const saveResult = await dialog.showSaveDialog(state.mainWindow, {
-      title: fmt === "pdf" ? "Export walkthrough PDF" : "Export user journey",
-      defaultPath: `journey-${stamp}.${ext}`,
+      title: fmt === "pdf" ? "Export walkthrough PDF" : fmt === "md" ? "Export walkthrough Markdown" : "Export user journey",
+      defaultPath: `journey-${stamp}.${fmt}`,
       filters: [filter]
     });
     if (saveResult.canceled || !saveResult.filePath) return { ok: false };
+    if (fmt === "md") {
+      const md = renderJourneyMarkdown(steps, meta);
+      fs.writeFileSync(saveResult.filePath, md, "utf8");
+      return { ok: true, path: saveResult.filePath };
+    }
+    const html = renderJourneyHtml(steps, meta);
     if (fmt === "html") {
       fs.writeFileSync(saveResult.filePath, html, "utf8");
       return { ok: true, path: saveResult.filePath };
@@ -769,6 +775,82 @@ function registerIpc() {
   ipcMain.handle("shell:open-external", (_e, url) => {
     try { shell.openExternal(url); return { ok: true }; } catch (err) { return { ok: false, error: String(err) }; }
   });
+}
+
+function renderJourneyMarkdown(selection, meta) {
+  const when = new Date(meta.startedAt).toLocaleString();
+  const title = meta.title || "User journey";
+  const framework = (meta.framework || "").toUpperCase() || "—";
+  const lines = [
+    `# ${title}`,
+    "",
+    `_Recorded ${when} · Framework ${framework} · ${selection.length} step${selection.length === 1 ? "" : "s"}_`,
+    ""
+  ];
+  for (const { step } of selection) {
+    const num = String(lines.filter((l) => /^## \d/.test(l)).length + 1).padStart(2, "0");
+    if (step.kind === "note") {
+      lines.push(`## ${num}. Note`, "");
+      lines.push(...String(step.text || "").split("\n").map((l) => `> ${l}`));
+      lines.push("");
+      if (step.screenshot) {
+        lines.push(`![Context screenshot](${step.screenshot})`, "");
+      }
+      lines.push("---", "");
+      continue;
+    }
+    if (step.kind === "capture") {
+      lines.push(`## ${num}. Capture`, "");
+      if (step.text) lines.push(String(step.text), "");
+      if (step.screenshot) {
+        lines.push(`![Annotated capture](${step.screenshot})`, "");
+        if (step.rect) {
+          const { x, y, width, height } = step.rect;
+          lines.push(`_Highlighted region: ${x.toFixed(1)}%, ${y.toFixed(1)}% — ${width.toFixed(1)}% × ${height.toFixed(1)}%_`, "");
+        }
+      }
+      lines.push("---", "");
+      continue;
+    }
+    if (step.kind === "wait") {
+      lines.push(`## ${num}. Wait ${Number(step.ms) || 0}ms`, "", "---", "");
+      continue;
+    }
+    if (step.kind === "assert") {
+      const loc = step.locator || {};
+      const sel = loc.css || loc.xpath || "";
+      const t = step.assertionType || "visible";
+      const phrase = {
+        visible: "is visible",
+        hidden: "is hidden",
+        text: `has text \`${step.expected ?? ""}\``,
+        contains: `contains \`${step.expected ?? ""}\``,
+        value: `has value \`${step.expected ?? ""}\``
+      }[t] || t;
+      lines.push(`## ${num}. Expect`, "", `**Selector:** \`${sel}\``, "", `**Assertion:** ${phrase}`, "", "---", "");
+      continue;
+    }
+    if (step.kind === "navigate") {
+      lines.push(`## ${num}. Navigate`, "", `→ ${step.url || ""}`, "");
+      if (step.screenshot) lines.push(`![Page screenshot](${step.screenshot})`, "");
+      lines.push("---", "");
+      continue;
+    }
+    // interactive steps: click, fill, select, check, press, submit
+    const d = describeStep(step);
+    const loc = step.locator || {};
+    const chain = Array.isArray(loc.shadowChain) && loc.shadowChain.length
+      ? loc.shadowChain.join(" » ") + " » "
+      : "";
+    const sel = loc.css || loc.xpath || "";
+    lines.push(`## ${num}. ${d.action}`, "");
+    lines.push(`**Target:** ${d.target}`, "");
+    if (sel) lines.push(`**Selector:** \`${chain}${sel}\``, "");
+    if (d.value !== undefined) lines.push(`**Value:** \`${JSON.stringify(d.value)}\``, "");
+    if (step.screenshot) lines.push(`![Screenshot](${step.screenshot})`, "");
+    lines.push("---", "");
+  }
+  return lines.join("\n");
 }
 
 async function renderHtmlToPdf(html) {

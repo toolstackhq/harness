@@ -82,6 +82,11 @@ export default function JourneyExportDialog({ steps, onClose, defaultFormat = "h
               className={`seg__btn${format === "pdf" ? " seg__btn--active" : ""}`}
               onClick={() => setFormat("pdf")}
             >PDF</button>
+            <button
+              className={`seg__btn${format === "md" ? " seg__btn--active" : ""}`}
+              onClick={() => setFormat("md")}
+              title="Single .md file with screenshots embedded as base64"
+            >MD</button>
           </div>
         </div>
         <div className="dialog__body journey-body">

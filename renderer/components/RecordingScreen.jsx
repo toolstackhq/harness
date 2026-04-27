@@ -152,15 +152,15 @@ export default function RecordingScreen({
         onForward={() => window.harness.browser.forward()}
         onReload={() => window.harness.browser.reload()}
         onNewSession={onNewSession}
-        canAddNote={true}
+        canAddNote={recording && replayState !== "running"}
         onAddNote={onAddNote}
-        canAddAssertion={session.recordType !== "doc"}
+        canAddAssertion={recording && replayState !== "running" && session.recordType !== "doc"}
         onAddAssertion={onAddAssertion}
-        canCapture={true}
+        canCapture={recording && replayState !== "running"}
         onCaptureArea={onCaptureArea}
         paused={paused}
-        onTogglePause={onTogglePause}
-        onAddWait={onAddWait}
+        onTogglePause={recording && replayState !== "running" ? onTogglePause : null}
+        onAddWait={recording && replayState !== "running" ? onAddWait : null}
       />
       <InfoBar
         cdp={recording}

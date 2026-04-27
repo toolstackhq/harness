@@ -2,7 +2,7 @@
 // + mp4-muxer for the container. Pure browser, no native deps, no ffmpeg.
 
 import { Muxer, ArrayBufferTarget } from "mp4-muxer";
-import { probeCanvasSize, renderStepFrame, sleep } from "./renderWalkthroughFrames.js";
+import { probeCanvasSize, renderSlideFrame, groupStepsToSlides, sleep } from "./renderWalkthroughFrames.js";
 
 export async function encodeWalkthroughMp4(steps, { fps = 4, holdMs = 2000, onProgress } = {}) {
   if (!steps.length) throw new Error("No steps to encode");
@@ -50,23 +50,26 @@ export async function encodeWalkthroughMp4(steps, { fps = 4, holdMs = 2000, onPr
   });
   encoder.configure(config);
 
-  // Each step holds for `holdMs`. With FPS = 4 and hold = 2000ms, that's
-  // 8 frames per step. Force a keyframe on every new step so seeks are clean.
-  const framesPerStep = Math.max(1, Math.round((holdMs / 1000) * fps));
+  // Each slide holds for `holdMs` (page slides scale with action count). Force
+  // a keyframe on every new slide so seeks are clean.
+  const slides = groupStepsToSlides(steps);
   const microPerFrame = Math.round(1_000_000 / fps);
   let frameIndex = 0;
 
-  for (let i = 0; i < steps.length; i++) {
-    onProgress?.(i, steps.length);
-    await renderStepFrame(ctx, steps[i], i, steps.length, w, h);
-    for (let f = 0; f < framesPerStep; f++) {
+  for (let i = 0; i < slides.length; i++) {
+    onProgress?.(i, slides.length);
+    await renderSlideFrame(ctx, slides[i], i, slides.length, w, h);
+    const slideHold = slides[i].kind === "page"
+      ? holdMs + 500 * Math.max(0, slides[i].actions.length - 1)
+      : holdMs;
+    const framesThisSlide = Math.max(1, Math.round((slideHold / 1000) * fps));
+    for (let f = 0; f < framesThisSlide; f++) {
       if (encodeError) throw encodeError;
       const ts = frameIndex * microPerFrame;
       const videoFrame = new VideoFrame(canvas, { timestamp: ts });
       encoder.encode(videoFrame, { keyFrame: f === 0 });
       videoFrame.close();
       frameIndex += 1;
-      // Yield occasionally so the encoder queue can drain and the UI breathes.
       if (frameIndex % 8 === 0) await sleep(0);
     }
   }
@@ -82,7 +85,7 @@ export async function encodeWalkthroughMp4(steps, { fps = 4, holdMs = 2000, onPr
   if (encodeError) throw encodeError;
   encoder.close();
   muxer.finalize();
-  onProgress?.(steps.length, steps.length);
+  onProgress?.(slides.length, slides.length);
 
   return new Uint8Array(muxer.target.buffer);
 }

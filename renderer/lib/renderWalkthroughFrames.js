@@ -28,6 +28,31 @@ export async function probeCanvasSize(steps, fallback = { w: 1280, h: 800 }) {
   return { w: roundEven(fallback.w), h: roundEven(fallback.h) };
 }
 
+const ACTION_KINDS = new Set(["click", "fill", "select", "check", "press", "submit", "assert"]);
+
+export function groupStepsToSlides(steps) {
+  const slides = [];
+  let buffer = null;
+  const flush = () => {
+    if (!buffer) return;
+    if (buffer.actions.length === 1) slides.push({ kind: "single", step: buffer.actions[0] });
+    else slides.push(buffer);
+    buffer = null;
+  };
+  for (const step of steps) {
+    if (ACTION_KINDS.has(step.kind)) {
+      if (!buffer) buffer = { kind: "page", actions: [], screenshot: null, url: step.url || "" };
+      buffer.actions.push(step);
+      if (step.screenshot) buffer.screenshot = step.screenshot;
+      continue;
+    }
+    flush();
+    slides.push({ kind: "single", step });
+  }
+  flush();
+  return slides;
+}
+
 function describeStep(step) {
   if (step.kind === "navigate") return { headline: "Navigate", body: step.url || "" };
   if (step.kind === "note") return { headline: "Note", body: step.text || "" };
@@ -136,6 +161,62 @@ function drawTextFrame(ctx, step, w, h) {
   }
   if (line) ctx.fillText(line, w / 2, yy);
   ctx.textAlign = "left";
+}
+
+function drawActionList(ctx, actions, index, total, w, h) {
+  const padX = 22;
+  const lineH = 22;
+  const headerH = 28;
+  const maxLines = Math.min(actions.length, 6);
+  const barH = headerH + lineH * maxLines + 12;
+  ctx.fillStyle = "rgba(32, 33, 36, 0.92)";
+  ctx.fillRect(0, h - barH, w, barH);
+  ctx.fillStyle = "rgba(255,255,255,0.6)";
+  ctx.font = "500 12px 'Roboto Mono', monospace";
+  ctx.textBaseline = "top";
+  ctx.fillText(`${String(index + 1).padStart(2, "0")} / ${String(total).padStart(2, "0")} · Page actions (${actions.length})`, padX, h - barH + 8);
+  ctx.fillStyle = "white";
+  ctx.font = "500 14px 'Google Sans', system-ui, sans-serif";
+  for (let i = 0; i < maxLines; i += 1) {
+    const { headline, body } = describeStep(actions[i]);
+    const text = `• ${headline}: ${body}`;
+    const truncated = text.length > 130 ? text.slice(0, 127) + "…" : text;
+    ctx.fillText(truncated, padX, h - barH + headerH + i * lineH);
+  }
+  if (actions.length > maxLines) {
+    ctx.fillStyle = "rgba(255,255,255,0.65)";
+    ctx.font = "400 12px 'Google Sans', system-ui, sans-serif";
+    ctx.fillText(`+ ${actions.length - maxLines} more`, padX, h - barH + headerH + maxLines * lineH - 4);
+  }
+}
+
+export async function renderSlideFrame(ctx, slide, index, total, w, h) {
+  if (slide.kind === "page") {
+    const last = [...slide.actions].reverse().find((s) => s.screenshot) || slide.actions[0];
+    const usableH = h - (28 + 22 * Math.min(slide.actions.length, 6) + 12);
+    if (last?.screenshot) {
+      try {
+        const img = await loadImage(last.screenshot);
+        ctx.fillStyle = "#202124";
+        ctx.fillRect(0, 0, w, h);
+        const scale = Math.min(w / img.width, usableH / img.height);
+        const dw = img.width * scale;
+        const dh = img.height * scale;
+        const dx = (w - dw) / 2;
+        const dy = (usableH - dh) / 2;
+        ctx.drawImage(img, dx, dy, dw, dh);
+      } catch (_) {
+        ctx.fillStyle = "#1a73e8";
+        ctx.fillRect(0, 0, w, h);
+      }
+    } else {
+      ctx.fillStyle = "#1a73e8";
+      ctx.fillRect(0, 0, w, h);
+    }
+    drawActionList(ctx, slide.actions, index, total, w, h);
+    return;
+  }
+  await renderStepFrame(ctx, slide.step, index, total, w, h);
 }
 
 export async function renderStepFrame(ctx, step, index, total, w, h) {

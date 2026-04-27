@@ -1,7 +1,7 @@
 // Encode a WebM walkthrough video using <canvas>.captureStream() +
 // MediaRecorder. Pure browser API, no native deps, no ffmpeg.
 
-import { probeCanvasSize, renderStepFrame, sleep } from "./renderWalkthroughFrames.js";
+import { probeCanvasSize, renderSlideFrame, groupStepsToSlides, sleep } from "./renderWalkthroughFrames.js";
 
 const MIME_PREFERENCES = [
   "video/webm;codecs=vp9",
@@ -43,16 +43,20 @@ export async function encodeWalkthroughVideo(steps, { fps = 4, holdMs = 2000, on
     const stopped = new Promise((resolve) => { recorder.onstop = resolve; });
     recorder.start(250);
 
-    const framesPerStep = Math.max(1, Math.round((holdMs / 1000) * fps));
+    const slides = groupStepsToSlides(steps);
     const frameInterval = Math.round(1000 / fps);
 
-    for (let i = 0; i < steps.length; i++) {
-      onProgress?.(i, steps.length);
-      await renderStepFrame(ctx, steps[i], i, steps.length, w, h);
+    for (let i = 0; i < slides.length; i++) {
+      onProgress?.(i, slides.length);
+      await renderSlideFrame(ctx, slides[i], i, slides.length, w, h);
+      const slideHold = slides[i].kind === "page"
+        ? holdMs + 500 * Math.max(0, slides[i].actions.length - 1)
+        : holdMs;
+      const framesThisSlide = Math.max(1, Math.round((slideHold / 1000) * fps));
       // Drive the captureStream manually so each rendered frame becomes a
       // recorded frame (rather than relying on auto-pacing, which Chromium
       // sometimes drops for off-screen canvases).
-      for (let f = 0; f < framesPerStep; f++) {
+      for (let f = 0; f < framesThisSlide; f++) {
         if (typeof track.requestFrame === "function") track.requestFrame();
         await sleep(frameInterval);
       }
@@ -65,7 +69,7 @@ export async function encodeWalkthroughVideo(steps, { fps = 4, holdMs = 2000, on
     recorder.stop();
     stream.getTracks().forEach((t) => t.stop());
     await stopped;
-    onProgress?.(steps.length, steps.length);
+    onProgress?.(slides.length, slides.length);
 
     const blob = new Blob(chunks, { type: "video/webm" });
     return new Uint8Array(await blob.arrayBuffer());

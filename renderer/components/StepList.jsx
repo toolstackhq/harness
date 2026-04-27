@@ -265,7 +265,9 @@ export default function StepList({
         >
           <Play size={14} /> Replay
         </button>
-        <button className="btn btn--secondary" onClick={onStop} disabled={!recording}>Stop</button>
+        {recording && (
+          <button className="btn btn--secondary" onClick={onStop} disabled={isReplaying}>Stop</button>
+        )}
       </div>
     </div>
   );

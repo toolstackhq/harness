@@ -31,8 +31,19 @@ export default function App() {
   const [sessionsRefresh, setSessionsRefresh] = useState(0);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState(null);
 
   const bumpSessions = () => setSessionsRefresh((k) => k + 1);
+
+  const showToast = (msg, kind = "rec") => {
+    setToast({ msg, kind, id: Date.now() });
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 1800);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   useEffect(() => {
     const off = window.harness.recorder.onError(({ message }) => {
@@ -46,6 +57,7 @@ export default function App() {
     const offResumed = window.harness.recorder.onResumed(() => setPaused(false));
     const offStopped = window.harness.recorder.onStopped(() => {
       setSession((s) => (s ? { ...s, stopped: true } : s));
+      showToast("Recording stopped", "stop");
     });
     return () => { offPaused(); offResumed(); offStopped(); };
   }, []);
@@ -95,6 +107,7 @@ export default function App() {
     });
     setInitialSteps([]);
     setSteps([]);
+    if (recordType !== "inspect") showToast("Recording started", "rec");
   };
 
   const onNewSession = async () => {
@@ -420,6 +433,11 @@ export default function App() {
         />
       )}
       {busy && <div className="dialog-backdrop"><div style={{ color: "white" }}>Starting…</div></div>}
+      {toast && (
+        <div key={toast.id} className={`toast toast--${toast.kind}`} role="status" aria-live="polite">
+          <span className="toast__dot" />{toast.msg}
+        </div>
+      )}
     </div>
   );
 }

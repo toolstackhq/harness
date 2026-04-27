@@ -12,5 +12,7 @@ renderer-dist/
 /*.mp4
 /*.html
 /*.md
+/*.txt
+/*.spec.js
 !/README.md
 .codex

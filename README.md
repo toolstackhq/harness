@@ -1,13 +1,21 @@
 # Harness — Script & Doc Gen
 
+![Harness startup screen](assets/harness-startup.png)
+
 Electron desktop app that records browser interactions in an embedded
 Chromium session via CDP and emits either:
-- test scripts (Playwright / Cypress / Selenium / custom template), or
-- annotated walkthroughs (HTML / PDF with per-click screenshots and
-  bounding-box callouts).
+- test scripts (Playwright / Cypress / Selenium JavaScript / Selenium
+  Java / custom template), with `{{random.email}}` /
+  `{{random.uuid}}` / `{{timestamp}}` and friends translated into
+  runtime expressions in the exported code, or
+- annotated walkthroughs (HTML / PDF / Markdown / WebM / MP4) with
+  per-click screenshots, element-pick captures, and a full image
+  annotator (pen, highlighter, shapes, text) for marking up grabs.
 
 Steps can be replayed back against the same browser using the CDP
-protocol directly, with visible per-step pass/fail feedback.
+protocol directly, with visible per-step pass/fail feedback. Recorded
+sessions can be organised into Postman-style folders, drag-dropped
+between them, and replayed against fresh state.
 
 The project was previously known as `recrd`. Existing history under
 `~/.config/recrd/` is migrated automatically on first launch.

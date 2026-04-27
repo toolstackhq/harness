@@ -33,6 +33,47 @@ Click around in a real browser. Harness watches via CDP and turns the
 session into a runnable test script or an annotated walkthrough doc.
 Replay it whenever you want to check the flow still works.
 
+> 🤖 **Record once, hand it to any LLM.** Pick framework + language + your
+> LLM, click **Copy to clipboard**, paste into Claude / GPT / Gemini.
+> Get back a runnable test for any framework, even ones Harness doesn't
+> ship.
+>
+> <details>
+> <summary><strong>Click for a real generated prompt</strong></summary>
+>
+> ```
+> You are Claude. Reason carefully but keep the final code production-quality, idiomatic, and minimal.
+> You are also a senior test automation specialist.
+>
+> # Task
+> Convert the recorded user flow below into a runnable **WebdriverIO** test, written in **TypeScript**.
+>
+> ## Requirements
+> - Use the exact selectors provided. Prefer the most stable form (id / data-testid / role) when there are alternatives.
+> - Treat any value that looks like sample data (emails, names, account numbers) as a parameter. Hoist it to a constant or test parameter at the top of the file.
+> - Add explicit waits for visibility / network idle where appropriate; do not insert blind sleeps unless the recorded flow had a wait step.
+> - For shadow DOM selectors written as `host >> child`, translate them into the framework's pierce syntax (e.g. Playwright's `>>`, Cypress `.shadow().find()`, Selenium's JS executor).
+> - Wrap the whole flow in a single test or describe block named after the recorded URL.
+> - If the framework needs imports / driver bootstrap, generate them. If driver setup depends on the user's machine (Selenium-Java for instance), explicitly call that out as a comment.
+> - Output only the final code in a fenced block, then a 2-3 line explanation. No marketing.
+>
+> ## Extra notes from the user
+> Wrap interactions in a Page Object Model. Target staging only.
+>
+> ## Recorded flow
+> 1. Navigate to `https://staging.example.com/login`.
+> 2. Fill "Email" (selector: `#email`) with the value `alice@example.com`.
+> 3. Fill "Password" (selector: `#password`) with the value `hunter2`.
+> 4. Click on "Sign in" (selector: `button[type='submit']`).
+> 5. Assert that "Welcome back" (selector: `.welcome`) is visible.
+> 6. Click on "Account" (selector: `nav-bar >> #account-link`).
+> 7. Assert that selector `[data-testid="balance"]` contains the text `$`.
+>
+> Return the test now.
+> ```
+>
+> </details>
+
 ![Harness startup screen](assets/harness-startup.png)
 
 ## What it does

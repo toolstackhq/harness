@@ -8,7 +8,35 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { replaySteps, QS_DEEP } = require("../recorder/replayEngine.js");
+const { replaySteps, QS_DEEP, expandTemplates } = require("../recorder/replayEngine.js");
+
+test("expandTemplates leaves plain strings untouched", () => {
+  assert.equal(expandTemplates("hello"), "hello");
+  assert.equal(expandTemplates(""), "");
+  assert.equal(expandTemplates(undefined), undefined);
+});
+
+test("expandTemplates substitutes {{random.number}} with default 7 digits", () => {
+  const out = expandTemplates("id={{random.number}}");
+  assert.match(out, /^id=\d{7}$/);
+});
+
+test("expandTemplates honours :N width on random.number and random.alpha", () => {
+  assert.match(expandTemplates("{{random.number:4}}"), /^\d{4}$/);
+  assert.match(expandTemplates("{{random.alpha:5}}"), /^[a-z]{5}$/);
+});
+
+test("expandTemplates handles uuid, timestamp, date.iso, email", () => {
+  assert.match(expandTemplates("{{random.uuid}}"), /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  assert.match(expandTemplates("{{timestamp}}"), /^\d{10,}$/);
+  assert.match(expandTemplates("{{date.iso}}"), /^\d{4}-\d{2}-\d{2}T/);
+  assert.match(expandTemplates("{{random.email}}"), /^user_\d+_\d+@example\.com$/);
+});
+
+test("expandTemplates substitutes multiple tokens in one string", () => {
+  const out = expandTemplates("acct-{{random.number:3}}-{{random.alpha:2}}");
+  assert.match(out, /^acct-\d{3}-[a-z]{2}$/);
+});
 
 test("QS_DEEP source defines __qsDeep, __qsDeepAll and __harnessHighlight", () => {
   assert.match(QS_DEEP, /window\.__qsDeep\b/);

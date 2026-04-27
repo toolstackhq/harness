@@ -107,6 +107,39 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function randomDigits(n) {
+  let s = "";
+  for (let i = 0; i < n; i += 1) s += Math.floor(Math.random() * 10);
+  return s;
+}
+
+function randomAlpha(n) {
+  const chars = "abcdefghijklmnopqrstuvwxyz";
+  let s = "";
+  for (let i = 0; i < n; i += 1) s += chars[Math.floor(Math.random() * 26)];
+  return s;
+}
+
+function randomUuid() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === "function") return globalThis.crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function expandTemplates(value) {
+  if (typeof value !== "string" || !value.includes("{{")) return value;
+  return value
+    .replace(/\{\{\s*timestamp\s*\}\}/g, () => String(Date.now()))
+    .replace(/\{\{\s*date\.iso\s*\}\}/g, () => new Date().toISOString())
+    .replace(/\{\{\s*random\.uuid\s*\}\}/g, () => randomUuid())
+    .replace(/\{\{\s*random\.email\s*\}\}/g, () => `user_${Date.now()}_${Math.floor(Math.random() * 1e4)}@example.com`)
+    .replace(/\{\{\s*random\.number(?::(\d+))?\s*\}\}/g, (_m, n) => randomDigits(Math.max(1, Math.min(20, Number(n) || 7))))
+    .replace(/\{\{\s*random\.alpha(?::(\d+))?\s*\}\}/g, (_m, n) => randomAlpha(Math.max(1, Math.min(40, Number(n) || 8))));
+}
+
 async function injectQsDeep(dbg) {
   try {
     await dbg.sendCommand("Runtime.evaluate", { expression: QS_DEEP, awaitPromise: false });
@@ -146,6 +179,24 @@ async function highlight(dbg, selector) {
   return ok === true;
 }
 
+async function scrollIntoView(dbg, selector) {
+  const js = `(() => {
+    const el = window.__qsDeep(${JSON.stringify(selector)});
+    if (!el || !el.getBoundingClientRect) return false;
+    const rect = el.getBoundingClientRect();
+    const inView = rect.top >= 0 && rect.left >= 0 &&
+      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
+      rect.right <= (window.innerWidth || document.documentElement.clientWidth);
+    if (!inView) {
+      try { el.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); }
+      catch (_) { try { el.scrollIntoView(); } catch (__) {} }
+    }
+    return true;
+  })()`;
+  try { await evalInPage(dbg, js); } catch (_) {}
+  await sleep(120);
+}
+
 const HIGHLIGHT_PAUSE_MS = 250;
 
 async function resolveWithRetry(dbg, selector, timeoutMs = 8000) {
@@ -165,6 +216,7 @@ async function resolveWithRetry(dbg, selector, timeoutMs = 8000) {
 
 async function clickElement(dbg, selector) {
   if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Click target not found after retries: ${selector}`);
+  await scrollIntoView(dbg, selector);
   if (!(await highlight(dbg, selector))) throw new Error(`Click target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const js = `(() => {
@@ -189,6 +241,7 @@ async function clickElement(dbg, selector) {
 
 async function fillElement(dbg, selector, value) {
   if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Fill target not found after retries: ${selector}`);
+  await scrollIntoView(dbg, selector);
   if (!(await highlight(dbg, selector))) throw new Error(`Fill target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const js = `(() => {
@@ -212,6 +265,7 @@ async function fillElement(dbg, selector, value) {
 
 async function selectOption(dbg, selector, value) {
   if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Select target not found after retries: ${selector}`);
+  await scrollIntoView(dbg, selector);
   if (!(await highlight(dbg, selector))) throw new Error(`Select target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const js = `(() => {
@@ -227,6 +281,7 @@ async function selectOption(dbg, selector, value) {
 
 async function checkElement(dbg, selector, checked) {
   if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Check target not found after retries: ${selector}`);
+  await scrollIntoView(dbg, selector);
   if (!(await highlight(dbg, selector))) throw new Error(`Check target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const js = `(() => {
@@ -242,6 +297,7 @@ async function checkElement(dbg, selector, checked) {
 
 async function pressKey(dbg, selector, key) {
   if (!(await resolveWithRetry(dbg, selector))) throw new Error(`Press target not found after retries: ${selector}`);
+  await scrollIntoView(dbg, selector);
   if (!(await highlight(dbg, selector))) throw new Error(`Press target not found: ${selector}`);
   await sleep(HIGHLIGHT_PAUSE_MS);
   const focus = `(() => {
@@ -354,11 +410,11 @@ async function replaySteps(steps, dbg, options = {}) {
       } else if (step.kind === "fill") {
         const sel = buildSelector(step);
         if (!sel) throw new Error("No selector");
-        await fillElement(dbg, sel, step.value ?? "");
+        await fillElement(dbg, sel, expandTemplates(step.value ?? ""));
       } else if (step.kind === "select") {
         const sel = buildSelector(step);
         if (!sel) throw new Error("No selector");
-        await selectOption(dbg, sel, step.value ?? "");
+        await selectOption(dbg, sel, expandTemplates(step.value ?? ""));
       } else if (step.kind === "check") {
         const sel = buildSelector(step);
         if (!sel) throw new Error("No selector");
@@ -383,4 +439,4 @@ async function replaySteps(steps, dbg, options = {}) {
   return results;
 }
 
-module.exports = { replaySteps, QS_DEEP };
+module.exports = { replaySteps, QS_DEEP, expandTemplates };

@@ -298,6 +298,28 @@ test("selenium-java shadow DOM uses JavascriptExecutor and surfaces a hint comme
   assert.match(code, /document\.querySelector\(.+\)\.shadowRoot\.querySelector/);
 });
 
+test("custom tokens override built-ins and embed user JS verbatim into exports", () => {
+  const events = [
+    { kind: "fill", value: "{{myAcct}}", element: { tag: "input", label: "Account" } }
+  ];
+  const code = generateCode({ traces: [{ events }] }, {
+    target: "playwright",
+    customTokens: [{ name: "myAcct", js: "['A','B'][Math.floor(Math.random()*2)]" }]
+  });
+  assert.match(code, /const ACCOUNT = \(\['A','B'\]\[Math\.floor\(Math\.random\(\)\*2\)\]\);/);
+});
+
+test("custom tokens map to their java expression for selenium-java exports", () => {
+  const events = [
+    { kind: "fill", value: "{{myAcct}}", element: { tag: "input", label: "Account" } }
+  ];
+  const code = generateCode({ traces: [{ events }] }, {
+    target: "selenium-java",
+    customTokens: [{ name: "myAcct", java: "java.util.List.of(\"A\",\"B\").get(0)" }]
+  });
+  assert.match(code, /String ACCOUNT = \(java\.util\.List\.of\("A","B"\)\.get\(0\)\);/);
+});
+
 test("dynamic value tokens are emitted as runtime JS expressions, not literal strings", () => {
   const events = [
     { kind: "fill", value: "{{random.email}}", element: { tag: "input", label: "Email" } },

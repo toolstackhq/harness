@@ -129,9 +129,18 @@ function randomUuid() {
   });
 }
 
-function expandTemplates(value) {
+function expandTemplates(value, customTokens = []) {
   if (typeof value !== "string" || !value.includes("{{")) return value;
-  return value
+  let out = value;
+  for (const t of customTokens || []) {
+    if (!t?.name || !t?.js) continue;
+    const safe = String(t.name).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(`\\{\\{\\s*${safe}\\s*\\}\\}`, "g"), () => {
+      try { return String(new Function(`return (${t.js});`)()); }
+      catch (_) { return ""; }
+    });
+  }
+  return out
     .replace(/\{\{\s*timestamp\s*\}\}/g, () => String(Date.now()))
     .replace(/\{\{\s*date\.iso\s*\}\}/g, () => new Date().toISOString())
     .replace(/\{\{\s*random\.uuid\s*\}\}/g, () => randomUuid())
@@ -366,7 +375,7 @@ async function waitForReady(dbg, timeout = 6000) {
 }
 
 async function replaySteps(steps, dbg, options = {}) {
-  const { onStep, signal } = options;
+  const { onStep, signal, customTokens } = options;
   const results = [];
   await injectQsDeep(dbg);
 
@@ -410,11 +419,11 @@ async function replaySteps(steps, dbg, options = {}) {
       } else if (step.kind === "fill") {
         const sel = buildSelector(step);
         if (!sel) throw new Error("No selector");
-        await fillElement(dbg, sel, expandTemplates(step.value ?? ""));
+        await fillElement(dbg, sel, expandTemplates(step.value ?? "", customTokens));
       } else if (step.kind === "select") {
         const sel = buildSelector(step);
         if (!sel) throw new Error("No selector");
-        await selectOption(dbg, sel, expandTemplates(step.value ?? ""));
+        await selectOption(dbg, sel, expandTemplates(step.value ?? "", customTokens));
       } else if (step.kind === "check") {
         const sel = buildSelector(step);
         if (!sel) throw new Error("No selector");

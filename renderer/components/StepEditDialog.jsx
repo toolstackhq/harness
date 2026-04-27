@@ -19,9 +19,22 @@ export default function StepEditDialog({ step, onSave, onClose }) {
   const [value, setValue] = useState(step.value ?? "");
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [customTokens, setCustomTokens] = useState([]);
   const ref = useRef(null);
   const valueRef = useRef(null);
   const pickerRef = useRef(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const s = await window.harness.settings.get();
+        if (!mounted) return;
+        setCustomTokens(Array.isArray(s?.customTokens) ? s.customTokens : []);
+      } catch (_) {}
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const insertToken = (token) => {
     const el = valueRef.current;
@@ -115,7 +128,27 @@ export default function StepEditDialog({ step, onSave, onClose }) {
                   </span>
                   {pickerOpen && (
                     <div className="token-picker" role="listbox">
-                      <div className="token-picker__header">Pick a dynamic value</div>
+                      {customTokens.length > 0 && (
+                        <>
+                          <div className="token-picker__header">Your custom tokens</div>
+                          {customTokens.map((t) => (
+                            <button
+                              type="button"
+                              key={`u_${t.name}`}
+                              className="token-picker__item"
+                              onClick={() => insertToken(`{{${t.name}}}`)}
+                            >
+                              <div className="token-picker__row">
+                                <span className="token-picker__label">{t.label || t.name}</span>
+                                <code className="token-picker__token">{`{{${t.name}}}`}</code>
+                              </div>
+                              {t.desc && <div className="token-picker__desc">{t.desc}</div>}
+                              <div className="token-picker__sample">JS: {String(t.js || "").slice(0, 80) || "(no js expr)"}</div>
+                            </button>
+                          ))}
+                        </>
+                      )}
+                      <div className="token-picker__header">Built-in</div>
                       {TEMPLATE_TOKENS.map((t) => (
                         <button
                           type="button"
@@ -131,6 +164,10 @@ export default function StepEditDialog({ step, onSave, onClose }) {
                           <div className="token-picker__sample">e.g. {t.sample}</div>
                         </button>
                       ))}
+                      <div className="token-picker__footer">
+                        Add your own in <code>~/.config/Harness/harness-settings.json</code> →
+                        <code>{` "customTokens": [{ "name": "myAcct", "js": "...", "java": "..." }]`}</code>
+                      </div>
                     </div>
                   )}
                 </div>

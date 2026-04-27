@@ -38,6 +38,20 @@ test("expandTemplates substitutes multiple tokens in one string", () => {
   assert.match(out, /^acct-\d{3}-[a-z]{2}$/);
 });
 
+test("expandTemplates honours user-defined customTokens with a JS expression", () => {
+  const out = expandTemplates("hello {{shouty}}!", [
+    { name: "shouty", js: "'WORLD'" }
+  ]);
+  assert.equal(out, "hello WORLD!");
+});
+
+test("expandTemplates falls back to empty string if a custom token's JS throws", () => {
+  const out = expandTemplates("[{{boom}}]", [
+    { name: "boom", js: "throw new Error('x');" }
+  ]);
+  assert.equal(out, "[]");
+});
+
 test("QS_DEEP source defines __qsDeep, __qsDeepAll and __harnessHighlight", () => {
   assert.match(QS_DEEP, /window\.__qsDeep\b/);
   assert.match(QS_DEEP, /window\.__qsDeepAll\b/);

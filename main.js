@@ -42,6 +42,29 @@ const PICKER_SCRIPT = `
     const tail = leaf(el);
     return chain.length ? chain.concat([tail]).join(" >> ") : tail;
   }
+  function snapshotAttrs(el) {
+    const attrs = {};
+    if (el.attributes) {
+      for (const a of Array.from(el.attributes)) attrs[a.name] = a.value;
+    }
+    const cs = (typeof getComputedStyle === "function") ? getComputedStyle(el) : null;
+    const r = el.getBoundingClientRect ? el.getBoundingClientRect() : null;
+    return {
+      tag: el.tagName.toLowerCase(),
+      text: (el.textContent || "").trim().slice(0, 200),
+      id: el.id || "",
+      classes: Array.from(el.classList || []),
+      attrs,
+      role: el.getAttribute && el.getAttribute("role") || "",
+      type: el.getAttribute && el.getAttribute("type") || "",
+      checked: typeof el.checked === "boolean" ? el.checked : null,
+      disabled: el.disabled === true,
+      readonly: el.readOnly === true || (el.getAttribute && el.getAttribute("readonly") !== null),
+      value: "value" in el ? String(el.value ?? "") : "",
+      visible: cs ? cs.display !== "none" && cs.visibility !== "hidden" : true,
+      rect: r ? { x: Math.round(r.left), y: Math.round(r.top), width: Math.round(r.width), height: Math.round(r.height) } : null
+    };
+  }
   document.addEventListener("contextmenu", (e) => {
     const path = typeof e.composedPath === "function" ? e.composedPath() : [e.target];
     const target = path.find((n) => n instanceof Element);
@@ -50,7 +73,7 @@ const PICKER_SCRIPT = `
     e.stopPropagation();
     try {
       const fn = globalThis.__harnessPick;
-      if (typeof fn === "function") fn(JSON.stringify({ selector: pickSelector(target) }));
+      if (typeof fn === "function") fn(JSON.stringify({ selector: pickSelector(target), details: snapshotAttrs(target) }));
     } catch (_) {}
   }, true);
 })();
@@ -140,7 +163,8 @@ function getSettings() {
       submit: "await this.submit('{selector}')"
     },
     captureSensitive: false,
-    lastUrl: "https://example.com"
+    lastUrl: "https://example.com",
+    customTokens: []
   };
   return { ...defaults, ...readJson(SETTINGS_PATH, {}) };
 }
@@ -180,6 +204,51 @@ function deleteSession(id) {
   const list = loadSessions().filter((s) => s.id !== id);
   writeSessions(list);
   return list;
+}
+
+function deriveSelectorName(step, used) {
+  const loc = step.locator || {};
+  const raw = loc.label || loc.name || loc.ariaLabel || loc.placeholder || loc.text || loc.id || loc.dataTestId || step.element?.text || "";
+  const tag = (loc.tag || step.element?.tag || "").toLowerCase();
+  const role = (loc.role || step.element?.role || "").toLowerCase();
+  const action = step.kind === "fill" ? "Input" : step.kind === "select" ? "Dropdown" : step.kind === "check" ? "Checkbox" : tag === "a" ? "Link" : role === "button" || tag === "button" ? "Button" : "Element";
+  let base = String(raw).trim();
+  if (!base) base = `${tag || "el"}`;
+  base = base.toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  if (!base) base = "el";
+  let candidate = `${base}_${action.toLowerCase()}`;
+  let n = 2;
+  while (used.has(candidate)) { candidate = `${base}_${action.toLowerCase()}_${n}`; n += 1; }
+  used.add(candidate);
+  return candidate;
+}
+
+function buildSelectorRows(steps) {
+  const used = new Set();
+  const rows = [];
+  const seenSelectors = new Set();
+  for (const step of steps || []) {
+    if (!["click", "fill", "select", "check", "press", "submit", "assert"].includes(step.kind)) continue;
+    const loc = step.locator || {};
+    const chain = Array.isArray(loc.shadowChain) ? loc.shadowChain : [];
+    const leaf = loc.css || loc.xpath || "";
+    if (!leaf) continue;
+    const selector = chain.length ? [...chain, leaf].join(" >> ") : leaf;
+    const dedupe = `${step.kind}|${selector}`;
+    if (seenSelectors.has(dedupe)) continue;
+    seenSelectors.add(dedupe);
+    rows.push({ name: deriveSelectorName(step, used), selector });
+  }
+  return rows;
+}
+
+function yamlEscape(value) {
+  const s = String(value ?? "");
+  if (/^[A-Za-z0-9_./#:-]+$/.test(s) && s.length > 0) return s;
+  return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
 function newId() {
@@ -385,7 +454,7 @@ async function startInspect(options) {
       if (method !== "Runtime.bindingCalled" || params?.name !== "__harnessPick") return;
       try {
         const data = JSON.parse(params.payload);
-        if (data?.selector) emitToRenderer("inspector:picked", { selector: data.selector });
+        if (data?.selector) emitToRenderer("inspector:picked", { selector: data.selector, details: data.details || null });
       } catch (_) {}
     };
     dbg.on("message", state.inspectMessageHandler);
@@ -557,6 +626,7 @@ async function runReplay(steps) {
   try {
     const results = await replaySteps(steps, dbg, {
       signal: controller.signal,
+      customTokens: getSettings().customTokens || [],
       onStep: (entry) => {
         if (entry.status === "pass") emitToRenderer("replay:step:pass", entry);
         else emitToRenderer("replay:step:fail", entry);
@@ -919,7 +989,7 @@ function registerIpc() {
       const steps = state.recorder ? state.recorder.getSteps() : [];
       if (!steps.length) return { ok: false, error: "No steps recorded yet" };
       const traces = state.recorder.getTraces();
-      const code = generateCode(traces, { target, mapping });
+      const code = generateCode(traces, { target, mapping, customTokens: settings.customTokens || [] });
       if (state.session) persistCurrentSession({ generatedScript: code });
       return { ok: true, code, framework: target };
     } catch (err) {
@@ -1026,6 +1096,49 @@ function registerIpc() {
     if (!updated) return { ok: false, error: "Session not found" };
     return { ok: true, session: updated };
   });
+  ipcMain.handle("sessions:export-selectors", async (_e, { id, format } = {}) => {
+    const fmt = String(format || "csv").toLowerCase();
+    let steps = [];
+    if (id) {
+      const sess = loadSessions().find((s) => s.id === id);
+      if (!sess) return { ok: false, error: "Session not found" };
+      steps = sess.steps || [];
+    } else if (state.recorder) {
+      steps = state.recorder.getSteps();
+    } else {
+      return { ok: false, error: "No active session" };
+    }
+    const rows = buildSelectorRows(steps);
+    if (!rows.length) return { ok: false, error: "No selectors to export" };
+    let body, ext, filterName;
+    if (fmt === "json") {
+      body = JSON.stringify(rows, null, 2);
+      ext = "json"; filterName = "JSON";
+    } else if (fmt === "yaml" || fmt === "yml") {
+      body = rows.map((r) => `- name: ${yamlEscape(r.name)}\n  selector: ${yamlEscape(r.selector)}`).join("\n");
+      ext = "yml"; filterName = "YAML";
+    } else if (fmt === "xml") {
+      const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      body = `<?xml version="1.0" encoding="UTF-8"?>\n<selectors>\n${rows.map((r) => `  <selector name="${esc(r.name)}">${esc(r.selector)}</selector>`).join("\n")}\n</selectors>\n`;
+      ext = "xml"; filterName = "XML";
+    } else {
+      const csvEscape = (s) => {
+        const v = String(s ?? "");
+        return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+      };
+      body = "name,selector\n" + rows.map((r) => `${csvEscape(r.name)},${csvEscape(r.selector)}`).join("\n") + "\n";
+      ext = "csv"; filterName = "CSV";
+    }
+    const result = await dialog.showSaveDialog(state.mainWindow, {
+      title: "Export selectors",
+      defaultPath: `selectors.${ext}`,
+      filters: [{ name: filterName, extensions: [ext] }]
+    });
+    if (result.canceled || !result.filePath) return { ok: false };
+    fs.writeFileSync(result.filePath, body, "utf8");
+    return { ok: true, path: result.filePath, count: rows.length };
+  });
+
   ipcMain.handle("sessions:replay", async (_e, id) => {
     const sess = loadSessions().find((s) => s.id === id);
     if (!sess) return { ok: false, error: "Session not found" };

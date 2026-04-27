@@ -87,7 +87,8 @@ contextBridge.exposeInMainWorld("harness", {
     setFolder: (id, folder) => invoke("sessions:set-folder", { id, folder }),
     saveFile: (payload) => invoke("sessions:save-file", payload),
     replay: (id) => invoke("sessions:replay", id),
-    setActiveName: (name) => invoke("session:set-name", name)
+    setActiveName: (name) => invoke("session:set-name", name),
+    exportSelectors: (payload) => invoke("sessions:export-selectors", payload)
   },
   openExternal: (url) => invoke("shell:open-external", url)
 });

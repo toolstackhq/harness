@@ -1,6 +1,47 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Close, Copy, Save, Play, Trash, Edit, actionIcon } from "./Icons.jsx";
 
+function SelectorExportMenu({ sessionId, disabled }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+  const exportAs = async (format) => {
+    setBusy(true);
+    setOpen(false);
+    try {
+      const r = await window.harness.sessions.exportSelectors({ id: sessionId, format });
+      if (r?.ok) alert(`Saved ${r.count} selectors → ${r.path}`);
+      else if (r?.error) alert(r.error);
+    } finally { setBusy(false); }
+  };
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button className="btn btn--secondary" disabled={disabled || busy} onClick={() => setOpen((v) => !v)}>
+        <Save size={14} /> Export selectors {open ? "▴" : "▾"}
+      </button>
+      {open && (
+        <div className="token-picker" style={{ width: 220, top: "auto", bottom: "calc(100% + 6px)" }}>
+          <div className="token-picker__header">Format</div>
+          {["csv", "json", "yaml", "xml"].map((f) => (
+            <button key={f} type="button" className="token-picker__item" onClick={() => exportAs(f)}>
+              <div className="token-picker__row">
+                <span className="token-picker__label">{f.toUpperCase()}</span>
+                <code className="token-picker__token">.{f === "yaml" ? "yml" : f}</code>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const CHIP = { playwright: "PW", cypress: "CY", selenium: "SE", "selenium-java": "JV", custom: "CX" };
 
 function describe(step) {
@@ -170,6 +211,7 @@ export default function SessionDetailModal({ session, onClose, onDelete, onRepla
           <button className="btn btn--danger" onClick={del}><Trash size={14} /> Delete</button>
           <div className="dialog__footer-group">
             <button className="btn btn--secondary" onClick={replay} disabled={(session.steps || []).length === 0}><Play size={14} /> Replay</button>
+            <SelectorExportMenu sessionId={session.id} disabled={(session.steps || []).length === 0} />
             <button className="btn btn--secondary" onClick={saveScript} disabled={!script}><Save size={14} /> Save</button>
             <button className="btn btn--primary" onClick={copyScript} disabled={!script}><Copy size={14} /> Copy Script</button>
           </div>

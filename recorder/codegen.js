@@ -9,7 +9,11 @@ function normalizeTarget(target) {
 
 const TOKEN_RE = /\{\{\s*([\w.]+(?::\d+)?)\s*\}\}/g;
 
-function tokenToJs(name) {
+function tokenToJs(name, customTokens) {
+  if (Array.isArray(customTokens)) {
+    const hit = customTokens.find((t) => t?.name === name);
+    if (hit && hit.js) return `(${hit.js})`;
+  }
   if (name === "timestamp") return "String(Date.now())";
   if (name === "date.iso") return "new Date().toISOString()";
   if (name === "random.uuid") {
@@ -29,17 +33,17 @@ function tokenToJs(name) {
   return JSON.stringify(`{{${name}}}`);
 }
 
-function valueToJsExpr(value) {
+function valueToJsExpr(value, customTokens) {
   if (typeof value !== "string" || !value.includes("{{")) return escapeString(value ?? "");
   const matches = [...value.matchAll(TOKEN_RE)];
   if (matches.length === 0) return escapeString(value);
-  if (matches.length === 1 && matches[0][0] === value) return tokenToJs(matches[0][1]);
+  if (matches.length === 1 && matches[0][0] === value) return tokenToJs(matches[0][1], customTokens);
   const escTpl = (s) => s.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
   let out = "`";
   let last = 0;
   for (const m of matches) {
     out += escTpl(value.slice(last, m.index));
-    out += "${" + tokenToJs(m[1]) + "}";
+    out += "${" + tokenToJs(m[1], customTokens) + "}";
     last = m.index + m[0].length;
   }
   out += escTpl(value.slice(last));
@@ -56,7 +60,11 @@ function escapeJavaString(s) {
     .replace(/\t/g, "\\t") + '"';
 }
 
-function tokenToJava(name) {
+function tokenToJava(name, customTokens) {
+  if (Array.isArray(customTokens)) {
+    const hit = customTokens.find((t) => t?.name === name);
+    if (hit && hit.java) return `(${hit.java})`;
+  }
   if (name === "timestamp") return "String.valueOf(System.currentTimeMillis())";
   if (name === "date.iso") return "java.time.Instant.now().toString()";
   if (name === "random.uuid") return "java.util.UUID.randomUUID().toString()";
@@ -76,17 +84,17 @@ function tokenToJava(name) {
   return escapeJavaString(`{{${name}}}`);
 }
 
-function valueToJavaExpr(value) {
+function valueToJavaExpr(value, customTokens) {
   if (typeof value !== "string" || !value.includes("{{")) return escapeJavaString(value ?? "");
   const matches = [...value.matchAll(TOKEN_RE)];
   if (matches.length === 0) return escapeJavaString(value);
-  if (matches.length === 1 && matches[0][0] === value) return tokenToJava(matches[0][1]);
+  if (matches.length === 1 && matches[0][0] === value) return tokenToJava(matches[0][1], customTokens);
   const parts = [];
   let last = 0;
   for (const m of matches) {
     const lit = value.slice(last, m.index);
     if (lit) parts.push(escapeJavaString(lit));
-    parts.push(`(${tokenToJava(m[1])})`);
+    parts.push(`(${tokenToJava(m[1], customTokens)})`);
     last = m.index + m[0].length;
   }
   const trail = value.slice(last);
@@ -332,7 +340,8 @@ function commentLinesJava(text) {
   return String(text || "").split(/\r?\n/).map((l) => `      // ${l}`).join("\n");
 }
 
-function renderSeleniumJava(trace) {
+function renderSeleniumJava(trace, opts = {}) {
+  const customTokens = opts.customTokens;
   const { byIndex, declarations } = extractInputVariables(trace);
   const hasShadow = trace.events.some((s) => Array.isArray(s.locator?.shadowChain) && s.locator.shadowChain.length > 0);
   const hasSelect = trace.events.some((s) => s.kind === "select");
@@ -356,7 +365,7 @@ function renderSeleniumJava(trace) {
   lines.push("");
   if (declarations.length) {
     lines.push("// Edit these to parameterise the flow.");
-    for (const d of declarations) lines.push(`String ${d.name} = ${valueToJavaExpr(d.value)};`);
+    for (const d of declarations) lines.push(`String ${d.name} = ${valueToJavaExpr(d.value, customTokens)};`);
     lines.push("");
   }
   let elIdx = 0;
@@ -393,9 +402,9 @@ function renderSeleniumJava(trace) {
     if (step.kind === "click") lines.push(`${elName}.click();`);
     else if (step.kind === "fill") {
       lines.push(`${elName}.clear();`);
-      lines.push(`${elName}.sendKeys(${varName || valueToJavaExpr(step.value ?? "")});`);
+      lines.push(`${elName}.sendKeys(${varName || valueToJavaExpr(step.value ?? "", customTokens)});`);
     } else if (step.kind === "select") {
-      lines.push(`new Select(${elName}).selectByValue(${varName || valueToJavaExpr(step.value ?? "")});`);
+      lines.push(`new Select(${elName}).selectByValue(${varName || valueToJavaExpr(step.value ?? "", customTokens)});`);
     } else if (step.kind === "check") {
       lines.push(`${elName}.click();`);
     } else if (step.kind === "press") {
@@ -484,7 +493,8 @@ function renderPlaywrightAssertion(step) {
   }
 }
 
-function renderPlaywright(trace) {
+function renderPlaywright(trace, opts = {}) {
+  const customTokens = opts.customTokens;
   const hasAsserts = trace.events.some((s) => s.kind === "assert");
   const { byIndex, declarations } = extractInputVariables(trace);
   const lines = [
@@ -495,7 +505,7 @@ function renderPlaywright(trace) {
   ];
   if (declarations.length) {
     lines.push("// Edit these to parameterise the flow.");
-    for (const d of declarations) lines.push(`const ${d.name} = ${valueToJsExpr(d.value)};`);
+    for (const d of declarations) lines.push(`const ${d.name} = ${valueToJsExpr(d.value, customTokens)};`);
     lines.push("");
   }
   lines.push(
@@ -529,8 +539,8 @@ function renderPlaywright(trace) {
     const l = renderPlaywrightLocator(loc);
     const varName = byIndex.get(i);
     if (step.kind === "click") lines.push(`    await ${l}.click();`);
-    else if (step.kind === "fill") lines.push(`    await ${l}.fill(${varName || valueToJsExpr(step.value ?? "")});`);
-    else if (step.kind === "select") lines.push(`    await ${l}.selectOption(${varName || valueToJsExpr(step.value ?? "")});`);
+    else if (step.kind === "fill") lines.push(`    await ${l}.fill(${varName || valueToJsExpr(step.value ?? "", customTokens)});`);
+    else if (step.kind === "select") lines.push(`    await ${l}.selectOption(${varName || valueToJsExpr(step.value ?? "", customTokens)});`);
     else if (step.kind === "check") lines.push(`    await ${l}.${step.checked ? "check" : "uncheck"}();`);
     else if (step.kind === "press") lines.push(`    await ${l}.press(${escapeString(step.key || "Enter")});`);
     else if (step.kind === "submit") lines.push(`    await ${l}.click();`);
@@ -553,12 +563,13 @@ function renderCypressAssertion(step) {
   }
 }
 
-function renderCypress(trace) {
+function renderCypress(trace, opts = {}) {
+  const customTokens = opts.customTokens;
   const { byIndex, declarations } = extractInputVariables(trace);
   const lines = [];
   if (declarations.length) {
     lines.push("// Edit these to parameterise the flow.");
-    for (const d of declarations) lines.push(`const ${d.name} = ${valueToJsExpr(d.value)};`);
+    for (const d of declarations) lines.push(`const ${d.name} = ${valueToJsExpr(d.value, customTokens)};`);
     lines.push("");
   }
   lines.push(`describe(${escapeString(trace.title || "recorded flow")}, () => {`, `  it('replays the flow', () => {`);
@@ -587,8 +598,8 @@ function renderCypress(trace) {
     const l = renderCypressLocator(loc);
     const varName = byIndex.get(i);
     if (step.kind === "click") lines.push(`    ${l}.click();`);
-    else if (step.kind === "fill") lines.push(`    ${l}.clear().type(${varName || valueToJsExpr(step.value ?? "")});`);
-    else if (step.kind === "select") lines.push(`    ${l}.select(${varName || valueToJsExpr(step.value ?? "")});`);
+    else if (step.kind === "fill") lines.push(`    ${l}.clear().type(${varName || valueToJsExpr(step.value ?? "", customTokens)});`);
+    else if (step.kind === "select") lines.push(`    ${l}.select(${varName || valueToJsExpr(step.value ?? "", customTokens)});`);
     else if (step.kind === "check") lines.push(`    ${l}.${step.checked ? "check" : "uncheck"}();`);
     else if (step.kind === "press") lines.push(`    ${l}.type(${escapeString(`{${(step.key || "enter").toLowerCase()}}`)});`);
     else if (step.kind === "submit") lines.push(`    ${l}.click();`);
@@ -614,7 +625,8 @@ function renderSeleniumAssertion(step) {
   }
 }
 
-function renderSelenium(trace) {
+function renderSelenium(trace, opts = {}) {
+  const customTokens = opts.customTokens;
   const { byIndex, declarations } = extractInputVariables(trace);
   const lines = [
     'import { Builder, By, Key } from "selenium-webdriver";',
@@ -622,7 +634,7 @@ function renderSelenium(trace) {
   ];
   if (declarations.length) {
     lines.push("// Edit these to parameterise the flow.");
-    for (const d of declarations) lines.push(`const ${d.name} = ${valueToJsExpr(d.value)};`);
+    for (const d of declarations) lines.push(`const ${d.name} = ${valueToJsExpr(d.value, customTokens)};`);
     lines.push("");
   }
   lines.push(
@@ -664,9 +676,9 @@ function renderSelenium(trace) {
     if (step.kind === "click") lines.push(`    await ${ref}.click();`);
     else if (step.kind === "fill") {
       lines.push(`    await ${ref}.clear();`);
-      lines.push(`    await ${ref}.sendKeys(${varName || valueToJsExpr(step.value ?? "")});`);
+      lines.push(`    await ${ref}.sendKeys(${varName || valueToJsExpr(step.value ?? "", customTokens)});`);
     } else if (step.kind === "select") {
-      lines.push(`    await ${ref}.sendKeys(${varName || valueToJsExpr(step.value ?? "")});`);
+      lines.push(`    await ${ref}.sendKeys(${varName || valueToJsExpr(step.value ?? "", customTokens)});`);
     } else if (step.kind === "check") {
       lines.push(`    await ${ref}.click();`);
     } else if (step.kind === "press") {
@@ -747,29 +759,30 @@ function renderCustom(trace, options = {}) {
 function generateCode(input, options = {}) {
   const target = normalizeTarget(options.target || "playwright");
   const traces = normalizeTrace(input);
+  const opts = { customTokens: options.customTokens };
   const bodies = traces.map((trace) => {
     switch (target) {
       case "playwright":
       case "pw":
-        return renderPlaywright(trace);
+        return renderPlaywright(trace, opts);
       case "cypress":
       case "cy":
-        return renderCypress(trace);
+        return renderCypress(trace, opts);
       case "selenium":
       case "wd":
-        return renderSelenium(trace);
+        return renderSelenium(trace, opts);
       case "selenium-java":
       case "wd-java":
       case "java":
-        return renderSeleniumJava(trace);
+        return renderSeleniumJava(trace, opts);
       case "custom":
         return renderCustom(trace, options);
       case "all":
         return [
-          "/* Playwright */", renderPlaywright(trace), "",
-          "/* Cypress */", renderCypress(trace), "",
-          "/* Selenium (JavaScript) */", renderSelenium(trace), "",
-          "/* Selenium (Java) */", renderSeleniumJava(trace), "",
+          "/* Playwright */", renderPlaywright(trace, opts), "",
+          "/* Cypress */", renderCypress(trace, opts), "",
+          "/* Selenium (JavaScript) */", renderSelenium(trace, opts), "",
+          "/* Selenium (Java) */", renderSeleniumJava(trace, opts), "",
           "/* Custom */", renderCustom(trace, options)
         ].join("\n");
       default:

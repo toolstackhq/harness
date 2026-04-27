@@ -76,12 +76,22 @@ function createRecorderScript(options = {}) {
       return sibs.indexOf(el) + 1;
     };
 
+    const TESTID_ATTRS = ["data-testid", "data-test-id", "data-cy", "data-pw", "data-qa"];
+    const findTestIdAttr = (el) => {
+      if (!el || !el.getAttribute) return null;
+      for (const a of TESTID_ATTRS) {
+        const v = el.getAttribute(a);
+        if (v) return { name: a, value: v };
+      }
+      return null;
+    };
+
     const buildCssForHost = (host) => {
       if (!host) return "";
-      const testId = host.getAttribute && host.getAttribute("data-testid");
+      const testId = findTestIdAttr(host);
       const id = host.id || "";
       const tag = host.tagName.toLowerCase();
-      if (testId) return \`[data-testid="\${testId.replace(/"/g, '\\"')}"]\`;
+      if (testId) return \`[\${testId.name}="\${testId.value.replace(/"/g, '\\"')}"]\`;
       if (id) return \`#\${cssEscape(id)}\`;
       return tag;
     };
@@ -102,16 +112,12 @@ function createRecorderScript(options = {}) {
     };
 
     const buildCss = (el) => {
-      const testId = el.getAttribute && el.getAttribute("data-testid");
-      const cy = el.getAttribute && el.getAttribute("data-cy");
-      const pw = el.getAttribute && el.getAttribute("data-pw");
+      const testId = findTestIdAttr(el);
       const id = el.id || "";
       const name = el.getAttribute && el.getAttribute("name");
       const aria = el.getAttribute && el.getAttribute("aria-label");
       const placeholder = el.getAttribute && el.getAttribute("placeholder");
-      if (testId) return \`[data-testid="\${testId.replace(/"/g, '\\"')}"]\`;
-      if (cy) return \`[data-cy="\${cy.replace(/"/g, '\\"')}"]\`;
-      if (pw) return \`[data-pw="\${pw.replace(/"/g, '\\"')}"]\`;
+      if (testId) return \`[\${testId.name}="\${testId.value.replace(/"/g, '\\"')}"]\`;
       if (id) return \`#\${cssEscape(id)}\`;
       if (name) return \`[name="\${name.replace(/"/g, '\\"')}"]\`;
       if (aria) return \`[aria-label="\${aria.replace(/"/g, '\\"')}"]\`;
@@ -130,14 +136,14 @@ function createRecorderScript(options = {}) {
 
     const buildXpath = (el) => {
       const tag = el.tagName.toLowerCase();
-      const testId = el.getAttribute && el.getAttribute("data-testid");
+      const testId = findTestIdAttr(el);
       const id = el.id || "";
       const name = el.getAttribute && el.getAttribute("name");
       const aria = el.getAttribute && el.getAttribute("aria-label");
       const placeholder = el.getAttribute && el.getAttribute("placeholder");
       const text = normalize(el.textContent || "");
       if (id) return \`//*[@id=\${xpathLiteral(id)}]\`;
-      if (testId) return \`//*[@data-testid=\${xpathLiteral(testId)}]\`;
+      if (testId) return \`//*[@\${testId.name}=\${xpathLiteral(testId.value)}]\`;
       if (name) return \`//*[@name=\${xpathLiteral(name)}]\`;
       if (aria) return \`//*[@aria-label=\${xpathLiteral(aria)}]\`;
       if (placeholder) return \`//\${tag}[@placeholder=\${xpathLiteral(placeholder)}]\`;
@@ -160,7 +166,9 @@ function createRecorderScript(options = {}) {
       const text = normalize(el.textContent || el.innerText || "");
       const label = labelText(el);
       const role = inferRole(el);
-      const dataTestId = el.getAttribute && (el.getAttribute("data-testid") || el.getAttribute("data-test-id") || el.getAttribute("data-cy") || el.getAttribute("data-pw")) || "";
+      const testIdMatch = findTestIdAttr(el);
+      const dataTestId = testIdMatch ? testIdMatch.value : "";
+      const dataTestIdAttr = testIdMatch ? testIdMatch.name : "";
       const password = tag === "input" && type === "password";
       const value = "value" in el ? String(el.value ?? "") : "";
       const css = buildCss(el);
@@ -187,6 +195,7 @@ function createRecorderScript(options = {}) {
         ariaLabel: (el.getAttribute && el.getAttribute("aria-label")) || "",
         placeholder: (el.getAttribute && el.getAttribute("placeholder")) || "",
         dataTestId,
+        dataTestIdAttr,
         href: (el.getAttribute && el.getAttribute("href")) || "",
         value: password && !CAPTURE_SENSITIVE ? "[redacted]" : value,
         checked: "checked" in el ? Boolean(el.checked) : false,

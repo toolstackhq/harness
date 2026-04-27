@@ -58,11 +58,26 @@ test("data-testid wins over id", () => {
   assert.equal(loc.quality, "high");
 });
 
-test("data-cy and data-pw also map to a high-quality locator", () => {
+test("data-cy and data-pw map to a high-quality locator using their actual attribute name", () => {
   const cy = buildLocatorSnapshot({ tag: "button", "data-cy": "submit" });
   const pw = buildLocatorSnapshot({ tag: "button", "data-pw": "submit" });
-  assert.equal(cy.css, '[data-testid="submit"]');
-  assert.equal(pw.css, '[data-testid="submit"]');
+  assert.equal(cy.css, '[data-cy="submit"]');
+  assert.equal(pw.css, '[data-pw="submit"]');
+  assert.equal(cy.reason, "data-cy");
+  assert.equal(pw.reason, "data-pw");
+});
+
+test("data-test-id (hyphenated) preserved in selector instead of being normalized to data-testid", () => {
+  const loc = buildLocatorSnapshot({ tag: "input", "data-test-id": "customerRegistrationNumber_input" });
+  assert.equal(loc.css, '[data-test-id="customerRegistrationNumber_input"]');
+  assert.equal(loc.reason, "data-test-id");
+  assert.equal(loc.quality, "high");
+});
+
+test("explicit dataTestIdAttr from recorder snapshot is honoured", () => {
+  const loc = buildLocatorSnapshot({ tag: "div", dataTestId: "x", dataTestIdAttr: "data-qa" });
+  assert.equal(loc.css, '[data-qa="x"]');
+  assert.equal(loc.reason, "data-qa");
 });
 
 test("name attribute is preferred over aria-label", () => {

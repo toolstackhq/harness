@@ -151,6 +151,11 @@ class DebuggerRecorder extends EventEmitter {
 
   async stop() {
     this.pause();
+    for (const timer of this.pollTimers.values()) {
+      try { clearInterval(timer); } catch (_) {}
+    }
+    this.pollTimers.clear();
+    this.sessions.clear();
     const dbg = this.webContents.debugger;
     try {
       dbg.off("message", this._onMessage);
@@ -197,7 +202,7 @@ class DebuggerRecorder extends EventEmitter {
     try {
       if (method === "Target.attachedToTarget") {
         const info = params.targetInfo || {};
-        if (info.type === "page" || info.type === "iframe") {
+        if (info.type === "page") {
           await this._installForSession(params.sessionId, info);
         }
         return;
@@ -350,6 +355,10 @@ class DebuggerRecorder extends EventEmitter {
     const trace = this._ensureTrace(info.targetId, info);
     const last = trace.events[trace.events.length - 1];
     if (last?.kind === "navigate" && last.url === url) return;
+    if (last && (last.kind === "click" || last.kind === "press" || last.kind === "submit")) {
+      const gap = now() - Number(last.ts || 0);
+      if (gap < 10000) return;
+    }
     const event = {
       kind: "navigate",
       url,

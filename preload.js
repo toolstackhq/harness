@@ -83,6 +83,7 @@ contextBridge.exposeInMainWorld("harness", {
     delete: (id) => invoke("sessions:delete", id),
     generate: (id) => invoke("sessions:generate", id),
     rename: (id, name) => invoke("sessions:rename", { id, name }),
+    setFolder: (id, folder) => invoke("sessions:set-folder", { id, folder }),
     saveFile: (payload) => invoke("sessions:save-file", payload),
     replay: (id) => invoke("sessions:replay", id),
     setActiveName: (name) => invoke("session:set-name", name)

@@ -238,6 +238,12 @@ function destroyBrowserView() {
   const view = state.browserView;
   state.browserView = null;
   try {
+    const wc = view.webContents;
+    if (wc && !wc.isDestroyed() && wc.debugger && wc.debugger.isAttached()) {
+      try { wc.debugger.detach(); } catch (_) {}
+    }
+  } catch (_) {}
+  try {
     if (state.mainWindow) state.mainWindow.contentView.removeChildView(view);
   } catch {}
   try { view.webContents.close(); } catch {}
@@ -512,6 +518,13 @@ async function runReplay(steps) {
   if (state.replayRunning) return { ok: false, error: "Replay already running" };
   if (!state.browserView) return { ok: false, error: "No browser session" };
   const wc = state.browserView.webContents;
+  // If a recorder is still attached (replay invoked right after stop-recording),
+  // detach its CDP listeners so they don't compete with the replay engine for
+  // Target.attachedToTarget / Runtime events. Steps are already in memory + on
+  // disk; the recorder instance can stay around for re-export.
+  if (state.recorder && state.recorder.started) {
+    try { await state.recorder.stop(); } catch (_) {}
+  }
   const dbg = wc.debugger;
   if (!dbg.isAttached()) {
     try { dbg.attach("1.3"); } catch (err) { return { ok: false, error: String(err?.message || err) }; }
@@ -874,6 +887,12 @@ function registerIpc() {
   ipcMain.handle("sessions:rename", (_e, { id, name }) => {
     const trimmed = String(name || "").trim().slice(0, 120);
     const updated = updateSession(id, { name: trimmed || null });
+    if (!updated) return { ok: false, error: "Session not found" };
+    return { ok: true, session: updated };
+  });
+  ipcMain.handle("sessions:set-folder", (_e, { id, folder }) => {
+    const trimmed = folder == null ? null : String(folder || "").trim().slice(0, 80) || null;
+    const updated = updateSession(id, { folder: trimmed });
     if (!updated) return { ok: false, error: "Session not found" };
     return { ok: true, session: updated };
   });
@@ -1345,7 +1364,8 @@ async function gracefulShutdown() {
 app.on("before-quit", async (e) => {
   if (_quitting) return;
   e.preventDefault();
-  await gracefulShutdown();
+  const timeout = new Promise((resolve) => setTimeout(resolve, 2000));
+  await Promise.race([gracefulShutdown(), timeout]);
   app.exit(0);
 });
 

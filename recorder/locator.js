@@ -54,7 +54,16 @@ function buildLocatorSnapshot(meta = {}) {
   const label = labelText(meta);
   const id = String(meta.id ?? "").trim();
   const nameAttr = String(meta.name ?? "").trim();
-  const dataTestId = String(meta.dataTestId ?? meta.testId ?? meta["data-testid"] ?? meta["data-cy"] ?? meta["data-pw"] ?? "").trim();
+  const TESTID_ATTRS = ["data-testid", "data-test-id", "data-cy", "data-pw", "data-qa"];
+  let dataTestId = String(meta.dataTestId ?? meta.testId ?? "").trim();
+  let dataTestIdAttr = String(meta.dataTestIdAttr ?? "").trim();
+  if (!dataTestId) {
+    for (const a of TESTID_ATTRS) {
+      const v = meta[a];
+      if (v) { dataTestId = String(v).trim(); dataTestIdAttr = a; break; }
+    }
+  }
+  if (dataTestId && !dataTestIdAttr) dataTestIdAttr = "data-testid";
   const ariaLabel = String(meta.ariaLabel ?? "").trim();
   const placeholder = String(meta.placeholder ?? "").trim();
   const text = normalizeWhitespace(meta.text ?? "");
@@ -69,9 +78,9 @@ function buildLocatorSnapshot(meta = {}) {
   let ambiguous = false;
 
   if (dataTestId) {
-    css = `[data-testid="${dataTestId.replace(/"/g, '\\"')}"]`;
+    css = `[${dataTestIdAttr}="${dataTestId.replace(/"/g, '\\"')}"]`;
     quality = "high";
-    reason = "data-testid";
+    reason = dataTestIdAttr;
   } else if (id) {
     css = `#${cssEscape(id)}`;
     quality = "high";
@@ -104,7 +113,7 @@ function buildLocatorSnapshot(meta = {}) {
     id
       ? `//*[@id=${xpathLiteral(id)}]`
       : dataTestId
-        ? `//*[@data-testid=${xpathLiteral(dataTestId)}]`
+        ? `//*[@${dataTestIdAttr}=${xpathLiteral(dataTestId)}]`
         : nameAttr
           ? `//*[@name=${xpathLiteral(nameAttr)}]`
           : ariaLabel

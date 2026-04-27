@@ -4,12 +4,12 @@ import { Close, Save } from "./Icons.jsx";
 const EDITABLE_VALUE_KINDS = new Set(["fill", "select", "press"]);
 
 const TEMPLATE_TOKENS = [
-  { token: "{{random.number}}", label: "Random number", desc: "7-digit random integer (use {{random.number:N}} for N digits)" },
-  { token: "{{random.alpha:8}}", label: "Random letters", desc: "Random lowercase letters (default 8, override with :N)" },
-  { token: "{{random.uuid}}", label: "UUID", desc: "Random UUID v4" },
-  { token: "{{random.email}}", label: "Random email", desc: "user_<ts>_<rand>@example.com" },
-  { token: "{{timestamp}}", label: "Timestamp", desc: "Date.now() at replay" },
-  { token: "{{date.iso}}", label: "ISO date", desc: "Current ISO timestamp at replay" }
+  { token: "{{random.number}}", label: "Random number", desc: "7-digit random integer. Use {{random.number:N}} for any width up to 20.", sample: "4827193" },
+  { token: "{{random.alpha:8}}", label: "Random letters", desc: "Random lowercase letters. Default 8 chars, override with :N (max 40).", sample: "qjflxzpr" },
+  { token: "{{random.uuid}}", label: "UUID", desc: "Random UUID v4 — guaranteed unique per replay.", sample: "f81d4fae-7dec-11d0-a765-00a0c91e6bf6" },
+  { token: "{{random.email}}", label: "Random email", desc: "Unique user_<ts>_<rand>@example.com address.", sample: "user_1714045932_8412@example.com" },
+  { token: "{{timestamp}}", label: "Timestamp", desc: "Milliseconds since epoch (Date.now()) at replay time.", sample: "1714045932148" },
+  { token: "{{date.iso}}", label: "ISO date", desc: "Current ISO 8601 timestamp at replay time.", sample: "2026-04-27T09:32:12.148Z" }
 ];
 
 export default function StepEditDialog({ step, onSave, onClose }) {
@@ -18,11 +18,14 @@ export default function StepEditDialog({ step, onSave, onClose }) {
   const [selector, setSelector] = useState(initialSelector);
   const [value, setValue] = useState(step.value ?? "");
   const [busy, setBusy] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const ref = useRef(null);
   const valueRef = useRef(null);
+  const pickerRef = useRef(null);
 
   const insertToken = (token) => {
     const el = valueRef.current;
+    setPickerOpen(false);
     if (!el) { setValue((v) => (v || "") + token); return; }
     const start = el.selectionStart ?? value.length;
     const end = el.selectionEnd ?? value.length;
@@ -32,6 +35,15 @@ export default function StepEditDialog({ step, onSave, onClose }) {
       try { el.focus(); el.setSelectionRange(start + token.length, start + token.length); } catch (_) {}
     });
   };
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onDoc = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) setPickerOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [pickerOpen]);
 
   useEffect(() => { ref.current?.focus(); }, []);
   useEffect(() => {
@@ -89,24 +101,39 @@ export default function StepEditDialog({ step, onSave, onClose }) {
                 spellCheck={false}
               />
               {step.kind === "fill" && (
-                <>
-                  <div className="field__help" style={{ marginTop: 6 }}>
-                    Use <code>{"{{token}}"}</code> placeholders to inject dynamic values at replay time. Click a token below to insert it at the cursor.
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
-                    {TEMPLATE_TOKENS.map((t) => (
-                      <button
-                        type="button"
-                        key={t.token}
-                        className="token-chip"
-                        title={t.desc}
-                        onClick={() => insertToken(t.token)}
-                      >
-                        {t.label}
-                      </button>
-                    ))}
-                  </div>
-                </>
+                <div ref={pickerRef} style={{ position: "relative", marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="btn btn--secondary"
+                    style={{ height: 30, padding: "0 12px", fontSize: 12 }}
+                    onClick={() => setPickerOpen((v) => !v)}
+                  >
+                    Insert dynamic value {pickerOpen ? "▴" : "▾"}
+                  </button>
+                  <span style={{ marginLeft: 8, fontSize: 12, color: "var(--grey-600)" }}>
+                    Replaced with a fresh value on every replay.
+                  </span>
+                  {pickerOpen && (
+                    <div className="token-picker" role="listbox">
+                      <div className="token-picker__header">Pick a dynamic value</div>
+                      {TEMPLATE_TOKENS.map((t) => (
+                        <button
+                          type="button"
+                          key={t.token}
+                          className="token-picker__item"
+                          onClick={() => insertToken(t.token)}
+                        >
+                          <div className="token-picker__row">
+                            <span className="token-picker__label">{t.label}</span>
+                            <code className="token-picker__token">{t.token}</code>
+                          </div>
+                          <div className="token-picker__desc">{t.desc}</div>
+                          <div className="token-picker__sample">e.g. {t.sample}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}

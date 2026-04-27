@@ -11,6 +11,7 @@ export default function RecordingScreen({
   onAddNote,
   onAddAssertion,
   onCaptureArea,
+  onCaptureElement,
   onEditStep,
   onDeleteStep,
   onInsertWaitAfter,
@@ -158,6 +159,7 @@ export default function RecordingScreen({
         onAddAssertion={onAddAssertion}
         canCapture={recording && replayState !== "running"}
         onCaptureArea={onCaptureArea}
+        onCaptureElement={recording && replayState !== "running" ? onCaptureElement : null}
         paused={paused}
         onTogglePause={recording && replayState !== "running" ? onTogglePause : null}
         onAddWait={recording && replayState !== "running" ? onAddWait : null}

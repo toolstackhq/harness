@@ -151,6 +151,18 @@ export default function App() {
     setCapture(null);
     if (session) await window.harness.browser.setVisible(true);
   };
+  const onCaptureElement = async () => {
+    if (!session) return;
+    showToast("Click an element to capture", "rec");
+    const result = await window.harness.capture.pickElement();
+    if (result?.ok) {
+      showToast("Element captured", "stop");
+    } else if (result?.cancelled) {
+      showToast("Capture cancelled", "stop");
+    } else if (result?.error) {
+      alert(result.error);
+    }
+  };
   const saveCapture = async ({ screenshot, rect, text, url }) => {
     const result = await window.harness.capture.save({ screenshot, rect, text, url });
     if (!result?.ok) {
@@ -353,6 +365,7 @@ export default function App() {
             onAddNote={onAddNote}
             onAddAssertion={onAddAssertion}
             onCaptureArea={onCaptureArea}
+            onCaptureElement={onCaptureElement}
             onEditStep={onEditStep}
             onDeleteStep={onDeleteStep}
             onInsertWaitAfter={onInsertWaitAfter}

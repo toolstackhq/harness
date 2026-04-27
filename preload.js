@@ -72,7 +72,8 @@ contextBridge.exposeInMainWorld("harness", {
   },
   capture: {
     snapshot: () => invoke("capture:snapshot"),
-    save: (payload) => invoke("capture:save", payload)
+    save: (payload) => invoke("capture:save", payload),
+    pickElement: () => invoke("capture:pick-element")
   },
   inspector: {
     highlight: (selector) => invoke("inspector:highlight", selector),

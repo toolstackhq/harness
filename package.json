@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "@medv/finder": "^4.0.2",
-    "mp4-muxer": "^5.2.2"
+    "mp4-muxer": "^5.2.2",
+    "tui-image-editor": "^3.15.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

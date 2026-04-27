@@ -24,6 +24,7 @@ export default function BrowserToolbar({
   onAddAssertion,
   canAddAssertion,
   onCaptureArea,
+  onCaptureElement,
   canCapture,
   paused,
   onTogglePause,
@@ -95,6 +96,16 @@ export default function BrowserToolbar({
           title="Capture an area and annotate (Ctrl+Shift+S)"
         >
           <Camera size={14} /> Capture area
+        </button>
+      )}
+      {canCapture && onCaptureElement && (
+        <button
+          className="btn btn--secondary"
+          style={{ height: 32, padding: "0 10px", fontSize: 12 }}
+          onClick={onCaptureElement}
+          title="Hover + click an element on the page to capture just that element"
+        >
+          <Camera size={14} /> Capture element
         </button>
       )}
       {recording && onAddWait && (

@@ -7,6 +7,94 @@ function normalizeTarget(target) {
   return typeof target === "string" ? target : String(target ?? "playwright");
 }
 
+const TOKEN_RE = /\{\{\s*([\w.]+(?::\d+)?)\s*\}\}/g;
+
+function tokenToJs(name) {
+  if (name === "timestamp") return "String(Date.now())";
+  if (name === "date.iso") return "new Date().toISOString()";
+  if (name === "random.uuid") {
+    return '(typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => { const r = Math.random()*16|0; return (c==="x"?r:(r&0x3)|0x8).toString(16); }))';
+  }
+  if (name === "random.email") return '`user_${Date.now()}_${Math.floor(Math.random()*1e4)}@example.com`';
+  let m = name.match(/^random\.number(?::(\d+))?$/);
+  if (m) {
+    const n = Math.max(1, Math.min(20, Number(m[1]) || 7));
+    return `Array.from({length:${n}},()=>Math.floor(Math.random()*10)).join("")`;
+  }
+  m = name.match(/^random\.alpha(?::(\d+))?$/);
+  if (m) {
+    const n = Math.max(1, Math.min(40, Number(m[1]) || 8));
+    return `Array.from({length:${n}},()=>"abcdefghijklmnopqrstuvwxyz"[Math.floor(Math.random()*26)]).join("")`;
+  }
+  return JSON.stringify(`{{${name}}}`);
+}
+
+function valueToJsExpr(value) {
+  if (typeof value !== "string" || !value.includes("{{")) return escapeString(value ?? "");
+  const matches = [...value.matchAll(TOKEN_RE)];
+  if (matches.length === 0) return escapeString(value);
+  if (matches.length === 1 && matches[0][0] === value) return tokenToJs(matches[0][1]);
+  const escTpl = (s) => s.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+  let out = "`";
+  let last = 0;
+  for (const m of matches) {
+    out += escTpl(value.slice(last, m.index));
+    out += "${" + tokenToJs(m[1]) + "}";
+    last = m.index + m[0].length;
+  }
+  out += escTpl(value.slice(last));
+  out += "`";
+  return out;
+}
+
+function escapeJavaString(s) {
+  return '"' + String(s ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t") + '"';
+}
+
+function tokenToJava(name) {
+  if (name === "timestamp") return "String.valueOf(System.currentTimeMillis())";
+  if (name === "date.iso") return "java.time.Instant.now().toString()";
+  if (name === "random.uuid") return "java.util.UUID.randomUUID().toString()";
+  if (name === "random.email") {
+    return '("user_" + System.currentTimeMillis() + "_" + java.util.concurrent.ThreadLocalRandom.current().nextInt(10000) + "@example.com")';
+  }
+  let m = name.match(/^random\.number(?::(\d+))?$/);
+  if (m) {
+    const n = Math.max(1, Math.min(18, Number(m[1]) || 7));
+    return `String.format("%0${n}d", java.util.concurrent.ThreadLocalRandom.current().nextLong((long)Math.pow(10,${n})))`;
+  }
+  m = name.match(/^random\.alpha(?::(\d+))?$/);
+  if (m) {
+    const n = Math.max(1, Math.min(40, Number(m[1]) || 8));
+    return `java.util.stream.IntStream.range(0,${n}).mapToObj(i -> String.valueOf((char)('a' + java.util.concurrent.ThreadLocalRandom.current().nextInt(26)))).collect(java.util.stream.Collectors.joining())`;
+  }
+  return escapeJavaString(`{{${name}}}`);
+}
+
+function valueToJavaExpr(value) {
+  if (typeof value !== "string" || !value.includes("{{")) return escapeJavaString(value ?? "");
+  const matches = [...value.matchAll(TOKEN_RE)];
+  if (matches.length === 0) return escapeJavaString(value);
+  if (matches.length === 1 && matches[0][0] === value) return tokenToJava(matches[0][1]);
+  const parts = [];
+  let last = 0;
+  for (const m of matches) {
+    const lit = value.slice(last, m.index);
+    if (lit) parts.push(escapeJavaString(lit));
+    parts.push(`(${tokenToJava(m[1])})`);
+    last = m.index + m[0].length;
+  }
+  const trail = value.slice(last);
+  if (trail) parts.push(escapeJavaString(trail));
+  if (!parts.length) return '""';
+  return parts.join(" + ");
+}
+
 function pickEvents(trace) {
   if (!trace) return [];
   if (Array.isArray(trace.events)) return trace.events;
@@ -199,6 +287,127 @@ function renderSeleniumLocator(locator) {
   }
 }
 
+function renderSeleniumJavaLocator(locator) {
+  const chain = Array.isArray(locator.shadowChain) ? locator.shadowChain : [];
+  const resolved = chooseLocatorForFramework(locator, "selenium");
+  if (chain.length > 0) {
+    const leaf = resolved.kind === "css" ? resolved.selector : locator.css || locator.xpath;
+    const stepsArr = [...chain, leaf];
+    const pierced = stepsArr
+      .map((sel, index) =>
+        index === 0
+          ? `document.querySelector(${escapeString(sel)})`
+          : `.shadowRoot.querySelector(${escapeString(sel)})`)
+      .join("");
+    return { kind: "shadowJs", script: `return ${pierced};` };
+  }
+  switch (resolved.kind) {
+    case "css":
+      return { kind: "by", expr: `By.cssSelector(${escapeJavaString(resolved.selector)})` };
+    case "xpath":
+      return { kind: "by", expr: `By.xpath(${escapeJavaString(resolved.selector)})` };
+    default:
+      return { kind: "by", expr: `By.cssSelector(${escapeJavaString(locator.css || locator.xpath || "body")})` };
+  }
+}
+
+function renderSeleniumJavaAssertion(step, refExpr) {
+  const expected = escapeJavaString(String(step.expected ?? ""));
+  switch (step.assertionType) {
+    case "hidden":
+      return `if (${refExpr}.isDisplayed()) throw new RuntimeException("Expected hidden");`;
+    case "text":
+      return `if (!${refExpr}.getText().trim().equals(${expected})) throw new RuntimeException("Text mismatch");`;
+    case "contains":
+      return `if (!${refExpr}.getText().contains(${expected})) throw new RuntimeException("Text does not contain");`;
+    case "value":
+      return `if (!${expected}.equals(${refExpr}.getAttribute("value"))) throw new RuntimeException("Value mismatch");`;
+    case "visible":
+    default:
+      return `if (!${refExpr}.isDisplayed()) throw new RuntimeException("Expected visible");`;
+  }
+}
+
+function commentLinesJava(text) {
+  return String(text || "").split(/\r?\n/).map((l) => `      // ${l}`).join("\n");
+}
+
+function renderSeleniumJava(trace) {
+  const { byIndex, declarations } = extractInputVariables(trace);
+  const hasShadow = trace.events.some((s) => Array.isArray(s.locator?.shadowChain) && s.locator.shadowChain.length > 0);
+  const hasSelect = trace.events.some((s) => s.kind === "select");
+  const lines = [
+    "// === Generated Selenium (Java) actions ===",
+    "// Driver setup is YOUR responsibility — this snippet assumes a variable",
+    "// `driver` of type org.openqa.selenium.WebDriver is already in scope.",
+    "//",
+    "// Example setup (change the browser/driver/options to match your machine):",
+    "//   System.setProperty(\"webdriver.chrome.driver\", \"/path/to/chromedriver\");",
+    "//   WebDriver driver = new ChromeDriver();",
+    "//",
+    "// Required imports — copy into your test file:",
+    "//   import org.openqa.selenium.By;",
+    "//   import org.openqa.selenium.Keys;",
+    "//   import org.openqa.selenium.WebDriver;",
+    "//   import org.openqa.selenium.WebElement;"
+  ];
+  if (hasShadow) lines.push("//   import org.openqa.selenium.JavascriptExecutor;   // shadow DOM");
+  if (hasSelect) lines.push("//   import org.openqa.selenium.support.ui.Select;     // <select> elements");
+  lines.push("");
+  if (declarations.length) {
+    lines.push("// Edit these to parameterise the flow.");
+    for (const d of declarations) lines.push(`String ${d.name} = ${valueToJavaExpr(d.value)};`);
+    lines.push("");
+  }
+  let elIdx = 0;
+  for (const [i, step] of trace.events.entries()) {
+    if (step.kind === "note") {
+      lines.push(String(step.text || "").split(/\r?\n/).map((l) => `// ${l}`).join("\n"));
+      continue;
+    }
+    if (step.kind === "capture") {
+      if (step.text) lines.push(`// [annotated capture] ${step.text}`);
+      continue;
+    }
+    if (step.kind === "wait") {
+      lines.push(`Thread.sleep(${Number(step.ms) || 0});`);
+      continue;
+    }
+    if (step.kind === "navigate") {
+      lines.push(`driver.get(${escapeJavaString(step.url)});`);
+      continue;
+    }
+    const loc = step.locator || {};
+    const sel = renderSeleniumJavaLocator(loc);
+    const elName = `el${elIdx++}`;
+    if (sel.kind === "shadowJs") {
+      lines.push(`WebElement ${elName} = (WebElement)((JavascriptExecutor)driver).executeScript(${escapeJavaString(sel.script)});`);
+    } else {
+      lines.push(`WebElement ${elName} = driver.findElement(${sel.expr});`);
+    }
+    if (step.kind === "assert") {
+      lines.push(renderSeleniumJavaAssertion(step, elName));
+      continue;
+    }
+    const varName = byIndex.get(i);
+    if (step.kind === "click") lines.push(`${elName}.click();`);
+    else if (step.kind === "fill") {
+      lines.push(`${elName}.clear();`);
+      lines.push(`${elName}.sendKeys(${varName || valueToJavaExpr(step.value ?? "")});`);
+    } else if (step.kind === "select") {
+      lines.push(`new Select(${elName}).selectByValue(${varName || valueToJavaExpr(step.value ?? "")});`);
+    } else if (step.kind === "check") {
+      lines.push(`${elName}.click();`);
+    } else if (step.kind === "press") {
+      const key = String(step.key || "ENTER").toUpperCase();
+      lines.push(`${elName}.sendKeys(Keys.${key});`);
+    } else if (step.kind === "submit") {
+      lines.push(`${elName}.submit();`);
+    }
+  }
+  return lines.join("\n");
+}
+
 function interpolate(template, bindings) {
   return String(template).replace(/\{(\w+)\}/g, (_, key) => {
     const val = bindings[key];
@@ -286,7 +495,7 @@ function renderPlaywright(trace) {
   ];
   if (declarations.length) {
     lines.push("// Edit these to parameterise the flow.");
-    for (const d of declarations) lines.push(`const ${d.name} = ${escapeString(d.value)};`);
+    for (const d of declarations) lines.push(`const ${d.name} = ${valueToJsExpr(d.value)};`);
     lines.push("");
   }
   lines.push(
@@ -320,8 +529,8 @@ function renderPlaywright(trace) {
     const l = renderPlaywrightLocator(loc);
     const varName = byIndex.get(i);
     if (step.kind === "click") lines.push(`    await ${l}.click();`);
-    else if (step.kind === "fill") lines.push(`    await ${l}.fill(${varName || escapeString(step.value ?? "")});`);
-    else if (step.kind === "select") lines.push(`    await ${l}.selectOption(${varName || escapeString(step.value ?? "")});`);
+    else if (step.kind === "fill") lines.push(`    await ${l}.fill(${varName || valueToJsExpr(step.value ?? "")});`);
+    else if (step.kind === "select") lines.push(`    await ${l}.selectOption(${varName || valueToJsExpr(step.value ?? "")});`);
     else if (step.kind === "check") lines.push(`    await ${l}.${step.checked ? "check" : "uncheck"}();`);
     else if (step.kind === "press") lines.push(`    await ${l}.press(${escapeString(step.key || "Enter")});`);
     else if (step.kind === "submit") lines.push(`    await ${l}.click();`);
@@ -349,7 +558,7 @@ function renderCypress(trace) {
   const lines = [];
   if (declarations.length) {
     lines.push("// Edit these to parameterise the flow.");
-    for (const d of declarations) lines.push(`const ${d.name} = ${escapeString(d.value)};`);
+    for (const d of declarations) lines.push(`const ${d.name} = ${valueToJsExpr(d.value)};`);
     lines.push("");
   }
   lines.push(`describe(${escapeString(trace.title || "recorded flow")}, () => {`, `  it('replays the flow', () => {`);
@@ -378,8 +587,8 @@ function renderCypress(trace) {
     const l = renderCypressLocator(loc);
     const varName = byIndex.get(i);
     if (step.kind === "click") lines.push(`    ${l}.click();`);
-    else if (step.kind === "fill") lines.push(`    ${l}.clear().type(${varName || escapeString(step.value ?? "")});`);
-    else if (step.kind === "select") lines.push(`    ${l}.select(${varName || escapeString(step.value ?? "")});`);
+    else if (step.kind === "fill") lines.push(`    ${l}.clear().type(${varName || valueToJsExpr(step.value ?? "")});`);
+    else if (step.kind === "select") lines.push(`    ${l}.select(${varName || valueToJsExpr(step.value ?? "")});`);
     else if (step.kind === "check") lines.push(`    ${l}.${step.checked ? "check" : "uncheck"}();`);
     else if (step.kind === "press") lines.push(`    ${l}.type(${escapeString(`{${(step.key || "enter").toLowerCase()}}`)});`);
     else if (step.kind === "submit") lines.push(`    ${l}.click();`);
@@ -413,7 +622,7 @@ function renderSelenium(trace) {
   ];
   if (declarations.length) {
     lines.push("// Edit these to parameterise the flow.");
-    for (const d of declarations) lines.push(`const ${d.name} = ${escapeString(d.value)};`);
+    for (const d of declarations) lines.push(`const ${d.name} = ${valueToJsExpr(d.value)};`);
     lines.push("");
   }
   lines.push(
@@ -455,9 +664,9 @@ function renderSelenium(trace) {
     if (step.kind === "click") lines.push(`    await ${ref}.click();`);
     else if (step.kind === "fill") {
       lines.push(`    await ${ref}.clear();`);
-      lines.push(`    await ${ref}.sendKeys(${varName || escapeString(step.value ?? "")});`);
+      lines.push(`    await ${ref}.sendKeys(${varName || valueToJsExpr(step.value ?? "")});`);
     } else if (step.kind === "select") {
-      lines.push(`    await ${ref}.sendKeys(${varName || escapeString(step.value ?? "")});`);
+      lines.push(`    await ${ref}.sendKeys(${varName || valueToJsExpr(step.value ?? "")});`);
     } else if (step.kind === "check") {
       lines.push(`    await ${ref}.click();`);
     } else if (step.kind === "press") {
@@ -549,13 +758,18 @@ function generateCode(input, options = {}) {
       case "selenium":
       case "wd":
         return renderSelenium(trace);
+      case "selenium-java":
+      case "wd-java":
+      case "java":
+        return renderSeleniumJava(trace);
       case "custom":
         return renderCustom(trace, options);
       case "all":
         return [
           "/* Playwright */", renderPlaywright(trace), "",
           "/* Cypress */", renderCypress(trace), "",
-          "/* Selenium */", renderSelenium(trace), "",
+          "/* Selenium (JavaScript) */", renderSelenium(trace), "",
+          "/* Selenium (Java) */", renderSeleniumJava(trace), "",
           "/* Custom */", renderCustom(trace, options)
         ].join("\n");
       default:
@@ -572,6 +786,7 @@ module.exports = {
   renderPlaywright,
   renderCypress,
   renderSelenium,
+  renderSeleniumJava,
   renderCustom,
   DEFAULT_CUSTOM_MAPPING
 };

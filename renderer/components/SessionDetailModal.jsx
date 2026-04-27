@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Close, Copy, Save, Play, Trash, Edit, actionIcon } from "./Icons.jsx";
 
-const CHIP = { playwright: "PW", cypress: "CY", selenium: "SE", custom: "CX" };
+const CHIP = { playwright: "PW", cypress: "CY", selenium: "SE", "selenium-java": "JV", custom: "CX" };
 
 function describe(step) {
   const loc = step.locator || {};

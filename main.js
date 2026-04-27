@@ -719,6 +719,131 @@ function registerIpc() {
       return { ok: false, error: String(err?.message || err) };
     }
   });
+  ipcMain.handle("capture:pick-element", async () => {
+    if (!state.browserView) return { ok: false, error: "No browser view" };
+    const wc = state.browserView.webContents;
+    const dbg = wc.debugger;
+    if (!dbg.isAttached()) {
+      try { dbg.attach("1.3"); } catch (err) { return { ok: false, error: String(err?.message || err) }; }
+    }
+    const wasPaused = state.recorder ? state.recorder.paused : true;
+    if (state.recorder) state.recorder.pause();
+    const BINDING = "harnessPickResult";
+    try {
+      await dbg.sendCommand("Runtime.enable");
+      await dbg.sendCommand("Runtime.addBinding", { name: BINDING });
+    } catch (_) {}
+
+    const PICK_SCRIPT = `(() => {
+      if (window.__harnessPick) return;
+      window.__harnessPick = true;
+      let last = null;
+      const overlay = document.createElement("div");
+      overlay.style.cssText = "position:fixed;border:2px solid #1a73e8;background:rgba(26,115,232,0.12);pointer-events:none;z-index:2147483647;transition:left 60ms,top 60ms,width 60ms,height 60ms;display:none";
+      overlay.setAttribute("data-harness-pick", "1");
+      document.documentElement.appendChild(overlay);
+      const tip = document.createElement("div");
+      tip.style.cssText = "position:fixed;top:8px;left:50%;transform:translateX(-50%);background:#202124;color:white;padding:6px 14px;border-radius:16px;font-family:sans-serif;font-size:12px;z-index:2147483647;box-shadow:0 1px 4px rgba(0,0,0,0.3);pointer-events:none";
+      tip.textContent = "Click an element to capture · ESC to cancel";
+      tip.setAttribute("data-harness-pick","1");
+      document.documentElement.appendChild(tip);
+      const cleanup = () => {
+        document.removeEventListener("mouseover", onMove, true);
+        document.removeEventListener("click", onClick, true);
+        document.removeEventListener("keydown", onKey, true);
+        try { overlay.remove(); } catch(_) {}
+        try { tip.remove(); } catch(_) {}
+        delete window.__harnessPick;
+      };
+      const onMove = (e) => {
+        const el = e.target;
+        if (!el || !(el instanceof Element)) return;
+        if (el.getAttribute && el.getAttribute("data-harness-pick")) return;
+        last = el;
+        const r = el.getBoundingClientRect();
+        overlay.style.left = r.left + "px";
+        overlay.style.top = r.top + "px";
+        overlay.style.width = r.width + "px";
+        overlay.style.height = r.height + "px";
+        overlay.style.display = "block";
+      };
+      const onClick = (e) => {
+        if (!last) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const target = last;
+        try { target.scrollIntoView({ block: "center", inline: "center", behavior: "instant" }); } catch (_) {}
+        cleanup();
+        setTimeout(() => {
+          const r = target.getBoundingClientRect();
+          window.harnessPickResult(JSON.stringify({
+            x: Math.max(0, Math.round(r.left)),
+            y: Math.max(0, Math.round(r.top)),
+            width: Math.max(1, Math.round(r.width)),
+            height: Math.max(1, Math.round(r.height)),
+            tag: target.tagName.toLowerCase(),
+            id: target.id || "",
+            text: (target.textContent || "").trim().slice(0, 80)
+          }));
+        }, 100);
+      };
+      const onKey = (e) => {
+        if (e.key === "Escape") {
+          cleanup();
+          window.harnessPickResult("CANCEL");
+        }
+      };
+      document.addEventListener("mouseover", onMove, true);
+      document.addEventListener("click", onClick, true);
+      document.addEventListener("keydown", onKey, true);
+    })();`;
+
+    const pickResult = await new Promise((resolve) => {
+      let timer;
+      const listener = (_event, method, params) => {
+        if (method === "Runtime.bindingCalled" && params.name === BINDING) {
+          try { dbg.off("message", listener); } catch (_) {}
+          if (timer) clearTimeout(timer);
+          resolve(params.payload);
+        }
+      };
+      try { dbg.on("message", listener); } catch (_) {}
+      dbg.sendCommand("Runtime.evaluate", { expression: PICK_SCRIPT, awaitPromise: false }).catch(() => {});
+      timer = setTimeout(() => {
+        try { dbg.off("message", listener); } catch (_) {}
+        resolve("TIMEOUT");
+      }, 60000);
+    });
+
+    if (state.recorder && !wasPaused) state.recorder.resume();
+
+    if (pickResult === "CANCEL" || pickResult === "TIMEOUT") {
+      return { ok: false, cancelled: pickResult === "CANCEL", error: pickResult === "TIMEOUT" ? "Selection timed out" : "Cancelled" };
+    }
+    let rect;
+    try { rect = JSON.parse(pickResult); } catch (_) { return { ok: false, error: "Bad pick result" }; }
+
+    await new Promise((r) => setTimeout(r, 60));
+    try {
+      const image = await wc.capturePage({
+        x: rect.x, y: rect.y,
+        width: rect.width, height: rect.height
+      });
+      if (image.isEmpty()) return { ok: false, error: "Empty capture" };
+      const dataUrl = image.toDataURL();
+      if (state.recorder && state.session) {
+        state.recorder.addCapture({
+          screenshot: dataUrl,
+          rect: { x: 0, y: 0, width: 100, height: 100 },
+          text: rect.id ? `<${rect.tag}#${rect.id}>` : (rect.text || `<${rect.tag}>`),
+          url: state.session.url
+        });
+      }
+      return { ok: true, dataUrl };
+    } catch (err) {
+      return { ok: false, error: String(err?.message || err) };
+    }
+  });
   ipcMain.handle("capture:save", (_e, payload) => {
     if (!state.recorder || !state.session) return { ok: false, error: "No active session" };
     const { screenshot, rect, text, url } = payload || {};
@@ -804,12 +929,17 @@ function registerIpc() {
   });
 
   ipcMain.handle("script:save", async (_e, { code, framework }) => {
-    const ext = framework === "cypress" ? "cy.js" : framework === "selenium" ? "js" : framework === "custom" ? "js" : "spec.js";
+    const isJava = framework === "selenium-java";
+    const ext = isJava ? "java" : framework === "cypress" ? "cy.js" : framework === "selenium" ? "js" : framework === "custom" ? "js" : "spec.js";
+    const defaultName = isJava ? "GeneratedFlow.java" : `recorded-flow.${ext}`;
+    const filters = isJava
+      ? [{ name: "Java", extensions: ["java"] }]
+      : [{ name: "JavaScript", extensions: ["js", "ts", "cjs", "mjs"] }];
     const win = state.mainWindow;
     const result = await dialog.showSaveDialog(win, {
       title: "Save generated script",
-      defaultPath: `recorded-flow.${ext}`,
-      filters: [{ name: "JavaScript", extensions: ["js", "ts", "cjs", "mjs"] }]
+      defaultPath: defaultName,
+      filters
     });
     if (result.canceled || !result.filePath) return { ok: false };
     fs.writeFileSync(result.filePath, code || "", "utf8");

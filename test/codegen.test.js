@@ -226,6 +226,97 @@ test("fill values are extracted as named const declarations", () => {
   assert.match(code, /\.fill\(PIN\)/);
 });
 
+test("selenium-java target emits a snippet that assumes `driver` is in scope, with import hints in comments", () => {
+  const events = [
+    { kind: "navigate", url: "https://example.com/login" },
+    { kind: "fill", value: "alice", element: { tag: "input", id: "user" } },
+    { kind: "click", element: { tag: "button", id: "submit" } },
+    { kind: "press", key: "Enter", element: { tag: "input", id: "user" } },
+    { kind: "assert", assertionType: "visible", locator: { css: "#welcome", shadowChain: [] } }
+  ];
+  const code = generateCode({ traces: [{ events }] }, { target: "selenium-java" });
+  assert.match(code, /Generated Selenium \(Java\) actions/);
+  assert.match(code, /Driver setup is YOUR responsibility/);
+  // Imports + driver setup live only in commented hints, not as real code.
+  assert.match(code, /\/\/\s+import org\.openqa\.selenium\.By;/);
+  assert.match(code, /\/\/\s+WebDriver driver = new ChromeDriver\(\);/);
+  assert.doesNotMatch(code, /^import /m);
+  assert.doesNotMatch(code, /^public class /m);
+  assert.doesNotMatch(code, /driver\.quit\(\);/);
+  // Actual recorded actions show up at top level (no class wrapper).
+  assert.match(code, /^driver\.get\("https:\/\/example\.com\/login"\);$/m);
+  assert.match(code, /driver\.findElement\(By\.cssSelector\(/);
+  assert.doesNotMatch(code, /By\.css\(/);
+  assert.match(code, /\.clear\(\);[\s\S]*\.sendKeys\(USER\)/);
+  assert.match(code, /\.sendKeys\(Keys\.ENTER\)/);
+  assert.match(code, /^if \(!el\d+\.isDisplayed\(\)\) throw new RuntimeException\("Expected visible"\);$/m);
+});
+
+test("selenium-java tokens map to Java runtime expressions", () => {
+  const events = [
+    { kind: "fill", value: "{{random.email}}", element: { tag: "input", label: "Email" } },
+    { kind: "fill", value: "{{random.number:5}}", element: { tag: "input", label: "Pin" } },
+    { kind: "fill", value: "{{random.uuid}}", element: { tag: "input", label: "Token" } },
+    { kind: "fill", value: "acct-{{random.alpha:3}}-{{timestamp}}", element: { tag: "input", label: "Account" } }
+  ];
+  const code = generateCode({ traces: [{ events }] }, { target: "selenium-java" });
+  assert.match(code, /String EMAIL = \("user_" \+ System\.currentTimeMillis\(\)/);
+  assert.match(code, /String PIN = String\.format\("%05d", java\.util\.concurrent\.ThreadLocalRandom\.current\(\)\.nextLong\(\(long\)Math\.pow\(10,5\)\)\);/);
+  assert.match(code, /String TOKEN = java\.util\.UUID\.randomUUID\(\)\.toString\(\);/);
+  // Mixed literal + tokens uses Java string concat.
+  assert.match(code, /String ACCOUNT = "acct-" \+ \(java\.util\.stream\.IntStream\.range\(0,3\)/);
+  assert.match(code, /\+ "-" \+ \(String\.valueOf\(System\.currentTimeMillis\(\)\)\);/);
+  assert.doesNotMatch(code, /"\{\{random\./);
+});
+
+test("selenium-java select emits new Select(...).selectByValue and a Select import hint", () => {
+  const events = [
+    { kind: "select", value: "GB", element: { tag: "select", id: "country" } }
+  ];
+  const code = generateCode({ traces: [{ events }] }, { target: "selenium-java" });
+  assert.match(code, /\/\/\s+import org\.openqa\.selenium\.support\.ui\.Select;/);
+  assert.match(code, /new Select\(el\d+\)\.selectByValue\(COUNTRY\);/);
+});
+
+test("selenium-java shadow DOM uses JavascriptExecutor and surfaces a hint comment", () => {
+  const events = [
+    {
+      kind: "click",
+      locator: {
+        css: "#inner",
+        shadowChain: ["my-host"],
+        xpath: "",
+        playwright: { kind: "css", selector: "#inner" },
+        cypress: { kind: "css", selector: "#inner" },
+        selenium: { kind: "css", selector: "#inner" }
+      }
+    }
+  ];
+  const code = generateCode({ traces: [{ events }] }, { target: "selenium-java" });
+  assert.match(code, /\/\/\s+import org\.openqa\.selenium\.JavascriptExecutor;/);
+  assert.match(code, /\(WebElement\)\(\(JavascriptExecutor\)driver\)\.executeScript\(/);
+  assert.match(code, /document\.querySelector\(.+\)\.shadowRoot\.querySelector/);
+});
+
+test("dynamic value tokens are emitted as runtime JS expressions, not literal strings", () => {
+  const events = [
+    { kind: "fill", value: "{{random.email}}", element: { tag: "input", label: "Email" } },
+    { kind: "fill", value: "{{random.number:4}}", element: { tag: "input", label: "Pin" } },
+    { kind: "fill", value: "{{random.uuid}}", element: { tag: "input", label: "Token" } },
+    { kind: "fill", value: "acct-{{random.alpha:3}}-{{timestamp}}", element: { tag: "input", label: "Account" } }
+  ];
+  const code = generateCode({ traces: [{ events }] }, { target: "playwright" });
+  assert.match(code, /const EMAIL = `user_\$\{Date\.now\(\)\}_\$\{Math\.floor\(Math\.random\(\)\*1e4\)\}@example\.com`;/);
+  assert.match(code, /const PIN = Array\.from\(\{length:4\},\(\)=>Math\.floor\(Math\.random\(\)\*10\)\)\.join\(""\);/);
+  assert.match(code, /const TOKEN = \(typeof crypto !== "undefined"/);
+  assert.match(code, /crypto\.randomUUID\(\)/);
+  // Mixed literal + tokens should produce a template literal with embedded expressions.
+  assert.match(code, /const ACCOUNT = `acct-\$\{Array\.from/);
+  assert.match(code, /\$\{String\(Date\.now\(\)\)\}`;/);
+  // Sanity: no literal "{{...}}" strings ended up in the script.
+  assert.doesNotMatch(code, /"\{\{random\./);
+});
+
 test("constant names dedupe with numeric suffixes on collision", () => {
   const events = [
     { kind: "fill", value: "v1", element: { tag: "input", label: "Field" } },

@@ -5,7 +5,7 @@ import ViewportSelector from "./ViewportSelector.jsx";
 import { Play, Globe, Reload } from "./Icons.jsx";
 
 function Chip({ framework }) {
-  const label = { playwright: "PW", cypress: "CY", selenium: "SE", custom: "CX" }[framework] || "PW";
+  const label = { playwright: "PW", cypress: "CY", selenium: "SE", "selenium-java": "JV", custom: "CX" }[framework] || "PW";
   return <span className={`framework-chip framework-chip--${framework}`}>{label}</span>;
 }
 

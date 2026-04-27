@@ -1,7 +1,7 @@
 import React from "react";
 import { Close, Copy, Save } from "./Icons.jsx";
 
-const CHIP = { playwright: "PW", cypress: "CY", selenium: "SE", custom: "CX" };
+const CHIP = { playwright: "PW", cypress: "CY", selenium: "SE", "selenium-java": "JV", custom: "CX" };
 
 export default function ScriptDialog({ code, framework, onClose, onCopy, onSave }) {
   return (

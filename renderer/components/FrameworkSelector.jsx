@@ -3,7 +3,8 @@ import React from "react";
 const FRAMEWORKS = [
   { id: "playwright", label: "Playwright", desc: "Modern cross-browser testing — role-based locators, pierce syntax for shadow DOM.", badge: "PW" },
   { id: "cypress", label: "Cypress", desc: "Runs in-browser, cy.get/cy.contains with .shadow() for shadow DOM.", badge: "CY" },
-  { id: "selenium", label: "Selenium", desc: "WebDriver protocol, By.css/By.xpath with JS executor for shadow DOM.", badge: "SE" },
+  { id: "selenium", label: "Selenium (JavaScript)", desc: "Node selenium-webdriver — By.css/By.xpath with JS executor for shadow DOM.", badge: "SE" },
+  { id: "selenium-java", label: "Selenium (Java)", desc: "Java + ChromeDriver — By.cssSelector/By.xpath with JavascriptExecutor for shadow DOM.", badge: "JV" },
   { id: "custom", label: "Custom", desc: "Define your own template mapping per action.", badge: "CX" }
 ];
 

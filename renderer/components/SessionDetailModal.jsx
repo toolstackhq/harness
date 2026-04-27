@@ -1,46 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Close, Copy, Save, Play, Trash, Edit, actionIcon } from "./Icons.jsx";
 
-function SelectorExportMenu({ sessionId, disabled }) {
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-  const exportAs = async (format) => {
-    setBusy(true);
-    setOpen(false);
-    try {
-      const r = await window.harness.sessions.exportSelectors({ id: sessionId, format });
-      if (r?.ok) alert(`Saved ${r.count} selectors → ${r.path}`);
-      else if (r?.error) alert(r.error);
-    } finally { setBusy(false); }
-  };
-  return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button className="btn btn--secondary" disabled={disabled || busy} onClick={() => setOpen((v) => !v)}>
-        <Save size={14} /> Export selectors {open ? "▴" : "▾"}
-      </button>
-      {open && (
-        <div className="token-picker" style={{ width: 220, top: "auto", bottom: "calc(100% + 6px)" }}>
-          <div className="token-picker__header">Format</div>
-          {["csv", "json", "yaml", "xml"].map((f) => (
-            <button key={f} type="button" className="token-picker__item" onClick={() => exportAs(f)}>
-              <div className="token-picker__row">
-                <span className="token-picker__label">{f.toUpperCase()}</span>
-                <code className="token-picker__token">.{f === "yaml" ? "yml" : f}</code>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 const CHIP = { playwright: "PW", cypress: "CY", selenium: "SE", "selenium-java": "JV", custom: "CX" };
 
@@ -211,10 +171,186 @@ export default function SessionDetailModal({ session, onClose, onDelete, onRepla
           <button className="btn btn--danger" onClick={del}><Trash size={14} /> Delete</button>
           <div className="dialog__footer-group">
             <button className="btn btn--secondary" onClick={replay} disabled={(session.steps || []).length === 0}><Play size={14} /> Replay</button>
-            <SelectorExportMenu sessionId={session.id} disabled={(session.steps || []).length === 0} />
-            <button className="btn btn--secondary" onClick={saveScript} disabled={!script}><Save size={14} /> Save</button>
-            <button className="btn btn--primary" onClick={copyScript} disabled={!script}><Copy size={14} /> Copy Script</button>
+            <ExportMenu
+              sessionId={session.id}
+              disabled={(session.steps || []).length === 0}
+              script={script}
+              onCopyScript={copyScript}
+              onSaveScript={saveScript}
+              onGenerate={generate}
+              generating={generating}
+            />
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExportMenu({ sessionId, disabled, script, onCopyScript, onSaveScript, onGenerate, generating }) {
+  const [open, setOpen] = useState(false);
+  const [llmOpen, setLlmOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const exportSelectorsAs = async (format) => {
+    setBusy(true);
+    setOpen(false);
+    try {
+      const r = await window.harness.sessions.exportSelectors({ id: sessionId, format });
+      if (r?.ok) alert(`Saved ${r.count} selectors → ${r.path}`);
+      else if (r?.error) alert(r.error);
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      <button className="btn btn--primary" disabled={disabled || busy || generating} onClick={() => setOpen((v) => !v)}>
+        <Save size={14} /> Export {open ? "▴" : "▾"}
+      </button>
+      {open && (
+        <div className="export-menu">
+          <div className="export-menu__section">
+            <div className="export-menu__title">Test script</div>
+            <div className="export-menu__hint">Direct codegen for the framework saved with this session.</div>
+            {script ? (
+              <>
+                <button className="export-menu__item" onClick={() => { setOpen(false); onCopyScript(); }}>
+                  <Copy size={14} /> Copy generated script
+                </button>
+                <button className="export-menu__item" onClick={() => { setOpen(false); onSaveScript(); }}>
+                  <Save size={14} /> Save script as file
+                </button>
+              </>
+            ) : (
+              <button className="export-menu__item" onClick={() => { setOpen(false); onGenerate(); }}>
+                <Play size={14} /> Generate now
+              </button>
+            )}
+          </div>
+          <div className="export-menu__section">
+            <div className="export-menu__title">Selectors</div>
+            <div className="export-menu__hint">For object-repository workflows. Two columns: name + selector.</div>
+            <div className="export-menu__row">
+              {["csv", "json", "yaml", "xml"].map((f) => (
+                <button key={f} className="export-menu__chip" onClick={() => exportSelectorsAs(f)}>{f.toUpperCase()}</button>
+              ))}
+            </div>
+          </div>
+          <div className="export-menu__section">
+            <div className="export-menu__title">LLM prompt</div>
+            <div className="export-menu__hint">Hand off to Claude / GPT / Gemini. Useful for frameworks Harness doesn't ship directly.</div>
+            <button className="export-menu__item" onClick={() => { setOpen(false); setLlmOpen(true); }}>
+              <Save size={14} /> Build LLM prompt…
+            </button>
+          </div>
+        </div>
+      )}
+      {llmOpen && <LlmPromptDialog sessionId={sessionId} onClose={() => setLlmOpen(false)} />}
+    </div>
+  );
+}
+
+const LLM_PRESETS = [
+  { id: "claude", label: "Claude" },
+  { id: "gpt", label: "ChatGPT (GPT-4 / 5)" },
+  { id: "gemini", label: "Gemini" },
+  { id: "other", label: "Other / generic" }
+];
+const FRAMEWORK_PRESETS = [
+  "Playwright", "Cypress", "Selenium", "WebdriverIO", "TestCafe", "Robot Framework",
+  "k6", "Cucumber + WebDriver", "Appium", "Custom"
+];
+const LANGUAGE_PRESETS = ["JavaScript", "TypeScript", "Java", "Python", "C#", "Ruby", "Go"];
+
+function LlmPromptDialog({ sessionId, onClose }) {
+  const [framework, setFramework] = useState("Playwright");
+  const [language, setLanguage] = useState("TypeScript");
+  const [llm, setLlm] = useState("claude");
+  const [extraNotes, setExtraNotes] = useState("");
+  const [customDescription, setCustomDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (action) => {
+    setBusy(true);
+    try {
+      const r = await window.harness.sessions.exportLlmPrompt({
+        id: sessionId,
+        action,
+        framework,
+        language,
+        llm,
+        extraNotes,
+        customDescription
+      });
+      if (r?.ok && r.copied) alert(`Copied ${r.length}-char prompt to clipboard.`);
+      else if (r?.ok && r.path) alert(`Saved prompt → ${r.path}`);
+      else if (r?.error) alert(r.error);
+      if (r?.ok) onClose?.();
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="dialog-backdrop" onClick={onClose}>
+      <div className="dialog" style={{ width: 540 }} onClick={(e) => e.stopPropagation()}>
+        <div className="dialog__header">
+          <div className="dialog__title">Build LLM prompt</div>
+          <button className="dialog__close" onClick={onClose}><Close /></button>
+        </div>
+        <div className="dialog__body" style={{ background: "white", padding: 16 }}>
+          <div className="field">
+            <label className="field__label">Target framework</label>
+            <select className="field__input" value={framework} onChange={(e) => setFramework(e.target.value)}>
+              {FRAMEWORK_PRESETS.map((f) => <option key={f}>{f}</option>)}
+            </select>
+            {framework === "Custom" && (
+              <input
+                className="field__input"
+                placeholder="Describe your framework / runner / config"
+                value={customDescription}
+                onChange={(e) => setCustomDescription(e.target.value)}
+                style={{ marginTop: 6 }}
+              />
+            )}
+          </div>
+          <div className="field">
+            <label className="field__label">Language</label>
+            <select className="field__input" value={language} onChange={(e) => setLanguage(e.target.value)}>
+              {LANGUAGE_PRESETS.map((l) => <option key={l}>{l}</option>)}
+            </select>
+          </div>
+          <div className="field">
+            <label className="field__label">Target LLM</label>
+            <select className="field__input" value={llm} onChange={(e) => setLlm(e.target.value)}>
+              {LLM_PRESETS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+            </select>
+            <div className="field__help">Adjusts persona phrasing — output format stays consistent.</div>
+          </div>
+          <div className="field">
+            <label className="field__label">Extra notes (optional)</label>
+            <textarea
+              className="field__textarea"
+              placeholder="e.g. wrap in a Page Object Model, add Cucumber-style data tables, target staging URL only…"
+              value={extraNotes}
+              onChange={(e) => setExtraNotes(e.target.value)}
+              rows={4}
+            />
+          </div>
+        </div>
+        <div className="dialog__footer">
+          <button className="btn btn--secondary" onClick={onClose}>Cancel</button>
+          <button className="btn btn--secondary" onClick={() => submit("save")} disabled={busy}>
+            <Save size={14} /> Save as .txt
+          </button>
+          <button className="btn btn--primary" onClick={() => submit("copy")} disabled={busy}>
+            <Copy size={14} /> Copy to clipboard
+          </button>
         </div>
       </div>
     </div>

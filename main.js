@@ -7,6 +7,7 @@ const crypto = require("node:crypto");
 const { app, BrowserWindow, WebContentsView, ipcMain, shell, dialog, clipboard, Menu, nativeImage } = require("electron");
 const { DebuggerRecorder } = require("./recorder/recorder.js");
 const { generateCode } = require("./recorder/codegen.js");
+const { buildLlmPrompt } = require("./recorder/llmPromptExport.js");
 const { replaySteps, QS_DEEP } = require("./recorder/replayEngine.js");
 
 const PICKER_SCRIPT = `
@@ -1137,6 +1138,33 @@ function registerIpc() {
     if (result.canceled || !result.filePath) return { ok: false };
     fs.writeFileSync(result.filePath, body, "utf8");
     return { ok: true, path: result.filePath, count: rows.length };
+  });
+
+  ipcMain.handle("sessions:export-llm-prompt", async (_e, payload = {}) => {
+    const { id, action, framework, language, llm, extraNotes, customDescription } = payload;
+    let steps = [];
+    if (id) {
+      const sess = loadSessions().find((s) => s.id === id);
+      if (!sess) return { ok: false, error: "Session not found" };
+      steps = sess.steps || [];
+    } else if (state.recorder) {
+      steps = state.recorder.getSteps();
+    } else {
+      return { ok: false, error: "No active session" };
+    }
+    const prompt = buildLlmPrompt(steps, { framework, language, llm, extraNotes, customDescription });
+    if (action === "copy") {
+      clipboard.writeText(prompt);
+      return { ok: true, copied: true, length: prompt.length };
+    }
+    const result = await dialog.showSaveDialog(state.mainWindow, {
+      title: "Save LLM prompt",
+      defaultPath: "harness-prompt.txt",
+      filters: [{ name: "Text", extensions: ["txt", "md"] }]
+    });
+    if (result.canceled || !result.filePath) return { ok: false };
+    fs.writeFileSync(result.filePath, prompt, "utf8");
+    return { ok: true, path: result.filePath, length: prompt.length };
   });
 
   ipcMain.handle("sessions:replay", async (_e, id) => {

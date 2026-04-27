@@ -88,7 +88,8 @@ contextBridge.exposeInMainWorld("harness", {
     saveFile: (payload) => invoke("sessions:save-file", payload),
     replay: (id) => invoke("sessions:replay", id),
     setActiveName: (name) => invoke("session:set-name", name),
-    exportSelectors: (payload) => invoke("sessions:export-selectors", payload)
+    exportSelectors: (payload) => invoke("sessions:export-selectors", payload),
+    exportLlmPrompt: (payload) => invoke("sessions:export-llm-prompt", payload)
   },
   openExternal: (url) => invoke("shell:open-external", url)
 });

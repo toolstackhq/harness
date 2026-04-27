@@ -17,9 +17,11 @@
 <p align="center">
   <a href="#install">Install</a> •
   <a href="#what-it-does">What it does</a> •
+  <a href="#export-menu">Export menu</a> •
   <a href="#frameworks">Frameworks</a> •
   <a href="#dynamic-values">Dynamic values</a> •
   <a href="#selector-only-export">Selector export</a> •
+  <a href="#llm-prompt-export">LLM prompt</a> •
   <a href="#inspector">Inspector</a> •
   <a href="#replay">Replay</a> •
   <a href="#folders">Folders</a>
@@ -42,6 +44,7 @@ Replay it whenever you want to check the flow still works.
 - Dynamic values. `{{random.email}}`, `{{random.uuid}}`, `{{timestamp}}` etc. Fresh value every replay, baked into exported scripts as runtime expressions. Add your own.
 - Folders. Postman-style. Drag a recording onto a folder chip to file it. Filter, rename, delete.
 - Selector-only export. CSV, JSON, YAML, or XML for object-repository workflows.
+- LLM prompt export. Hand the recorded flow off to Claude / GPT / Gemini for any framework Harness doesn't ship directly.
 - Inspector. Right-click any element in the embedded browser to see its selector plus a full attribute table.
 
 ## Install
@@ -61,6 +64,16 @@ npm start
 ```
 
 Sessions persist under `~/.config/Harness/`.
+
+## Export menu
+
+Open any saved session, hit **Export ▾**. Three categories:
+
+- **Test script** — direct codegen for the framework saved with the session. Copy or save as a file.
+- **Selectors** — CSV / JSON / YAML / XML for object-repository workflows.
+- **LLM prompt** — opens a small dialog asking for framework, language, target LLM, and any extra notes. Output copies to clipboard or saves as `.txt`.
+
+Walkthrough docs (HTML / PDF / Markdown / WebM / MP4) keep their own dialog from the active recording session toolbar.
 
 ## Frameworks
 
@@ -130,6 +143,46 @@ sign_in_button,button[type="submit"]
 Names are derived from the locator label, name, aria-label,
 placeholder, text, id, or data-testid, then suffixed with the action
 kind. Duplicates get numeric suffixes.
+
+## LLM prompt export
+
+For frameworks Harness doesn't ship (WebdriverIO, TestCafe, Robot,
+Cucumber, Appium, k6, custom in-house runners), record the flow then
+**Export ▾ → Build LLM prompt…**. Pick:
+
+- **Target framework** — Playwright, Cypress, Selenium, WebdriverIO, TestCafe, Robot, k6, Cucumber + WebDriver, Appium, or Custom (free-text description)
+- **Language** — JavaScript, TypeScript, Java, Python, C#, Ruby, Go
+- **Target LLM** — Claude, ChatGPT, Gemini, or generic
+- **Extra notes** — free-text guidance (Page Object Model, parameterise these values, target staging only, etc)
+
+Click **Copy to clipboard** or **Save as .txt**. The prompt looks like:
+
+```
+You are Claude. Reason carefully but keep the final code production-quality, idiomatic, and minimal.
+You are also a senior test automation specialist.
+
+# Task
+Convert the recorded user flow below into a runnable **Playwright** test, written in **TypeScript**.
+
+## Requirements
+- Use the exact selectors provided. Prefer the most stable form (id / data-testid / role) when there are alternatives.
+- Treat any value that looks like sample data (emails, names, account numbers) as a parameter…
+- Add explicit waits for visibility / network idle where appropriate; do not insert blind sleeps unless the recorded flow had a wait step.
+- For shadow DOM selectors written as `host >> child`, translate them into the framework's pierce syntax…
+- Wrap the whole flow in a single test or describe block named after the recorded URL.
+- Output only the final code in a fenced block, then a 2-3 line explanation. No marketing.
+
+## Recorded flow
+1. Navigate to `https://example.com/login`.
+2. Fill "Email" (selector: `#email`) with the value `alice@example.com`.
+3. Fill "Password" (selector: `#password`) with the value `hunter2`.
+4. Click on "Sign in" (selector: `button[type='submit']`).
+5. Assert that selector `.welcome` is visible.
+
+Return the test now.
+```
+
+Paste straight into your LLM. Same recording, infinite frameworks.
 
 ## Inspector
 

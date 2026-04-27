@@ -1,0 +1,98 @@
+// Trace 1
+import { chromium } from "playwright";
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+  try {
+    await page.goto("https://login.anz.com/internetbanking");
+    await page.getByRole("link", { name: "What’s new" }).click();
+    await page.goto("https://www.anz.com.au/support/online-banking/internet-banking/");
+    await page.getByRole("link", { name: "Manage your card landing page" }).click();
+    await page.goto("https://www.anz.com.au/support/online-banking/manage-your-card/");
+    await page.locator("p:nth-of-type(1)").click();
+    await page.getByRole("link", { name: "ANZ Falcon®" }).click();
+    await page.goto("https://www.anz.com.au/security/how-we-protect-you/falcon/");
+    await page.getByRole("link", { name: "Common questions" }).click();
+  } finally {
+    await browser.close();
+  }
+})();
+
+// Trace 2
+import { chromium } from "playwright";
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+  try {
+    await page.goto("https://1.b406929acabac9b095f124c81bdfcf57f.com/scripts/prod/crossdomain.html");
+  } finally {
+    await browser.close();
+  }
+})();
+
+// Trace 3
+import { chromium } from "playwright";
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+  try {
+    await page.goto("https://1.a79ab95c1589a13f8a4cab612bc71f9f7.com/scripts/prod/crossdomain.html");
+  } finally {
+    await browser.close();
+  }
+})();
+
+// Trace 4
+import { chromium } from "playwright";
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+  try {
+    await page.goto("https://awapse2.advanced-web-analytics.com/947684/confr.html?e=https%3A%2F%2Flogin.anz.com&es=eyJlIjoiK2U0Szc0b0Z4QWxoMlwvNFFXMld3aTFBak9ROEhXMDZ0VkNnWEZ6ZlRUalJXbU5QTnBpdzRMekNIRjVhTWs1WWhlNkJWSmRsREZIR25GV1wvVkRyeDlLWmhKNFREc3FvcDFNNyt0MkNwZFdTa0RHVDFZanl6aXRrNzQ3cCs0eG45WXk2QlVoSjgzTkdTY1I3RFVcLzVTUTJZWWU1OFF5eEhIUGlWcjRBQlpCaVwvOD0iLCJpIjoiWGFDVFNucGUrOWRwZUx0RUNCSEdzZz09In0%3D.95490caef5294212.N2I1ZjRmMWViMzE0NGQ0NjhkNWI3ZGI5OTJiOTc2ODUxYTg2ODBhYTkwMzAzYjBhNmU2MzFkZTEwZDQ1Y2JmZg%3D%3D&re=https%3A%2F%2Flogin.anz.com%2Finternetbanking&eu=https%3A%2F%2Flogin.anz.com%2Finternetbanking&icid=177724733559479804");
+  } finally {
+    await browser.close();
+  }
+})();
+
+// Trace 5
+import { chromium } from "playwright";
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+  try {
+    await page.goto("https://anz.demdex.net/dest5.html?d_nsid=0#https%3A%2F%2Fwww.anz.com.au");
+  } finally {
+    await browser.close();
+  }
+})();
+
+// Trace 6
+import { chromium } from "playwright";
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+  try {
+    await page.goto("https://lpcdn.lpsnmedia.net/le_secure_storage/3.36.1-release_2314911046/storage.secure.min.html?loc=https%3A%2F%2Fwww.anz.com.au&site=54022801&ist=sessionStorage&env=prod&accdn=accdn.lpsnmedia.net&isFetchEnabled=true");
+  } finally {
+    await browser.close();
+  }
+})();
+
+// Trace 7
+import { chromium } from "playwright";
+
+(async () => {
+  const browser = await chromium.launch({ headless: false });
+  const page = await browser.newPage();
+  try {
+    await page.goto("https://lpcdn.lpsnmedia.net/le_secure_storage/3.36.1-release_2314911046/storage.secure.min.html?loc=https%3A%2F%2Fwww.anz.com.au&site=54022801&ist=sessionStorage&env=prod&accdn=accdn.lpsnmedia.net&isFetchEnabled=true");
+  } finally {
+    await browser.close();
+  }
+})();

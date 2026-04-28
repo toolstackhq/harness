@@ -319,7 +319,11 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
                 <button className="folder-chip folder-chip--ghost" onClick={onCreateFolder} title="Create a folder; assign sessions via Move or drag-drop.">+ New folder</button>
               </div>
               {sessions.length === 0 ? (
-                <div className="recent-item__empty">No saved sessions yet.</div>
+                <div className="recent-item__empty">
+                  <strong>No saved sessions yet</strong>
+                  Hit <em>Start Recording</em> on the left to capture your first flow.
+                  It will show up here with replay, script, and doc-export options.
+                </div>
               ) : (
                 (() => {
                   const q = query.trim().toLowerCase();

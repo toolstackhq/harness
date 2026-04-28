@@ -24,7 +24,7 @@ export default function AppBar({ section, primary, secondary, onHelp }) {
       </div>
       <div className="app-bar__spacer" />
       <ActionButton action={secondary} variant="secondary" />
-      <ActionButton action={primary} variant="primary" />
+      {React.isValidElement(primary) ? primary : <ActionButton action={primary} variant="primary" />}
       <button
         className="btn btn--icon"
         onClick={onHelp}

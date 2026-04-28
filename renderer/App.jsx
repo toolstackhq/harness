@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import AppBar from "./components/AppBar.jsx";
+import ActiveExportMenu from "./components/ActiveExportMenu.jsx";
 import Breadcrumb from "./components/Breadcrumb.jsx";
 import StartupScreen from "./components/StartupScreen.jsx";
 import RecordingScreen from "./components/RecordingScreen.jsx";
@@ -320,30 +321,14 @@ export default function App() {
       <AppBar
         section={session ? sessionLabel : "New session"}
         primary={
-          session && session.recordType !== "inspect"
-            ? {
-                label: session.recordType === "doc" ? "Export walkthrough" : "Generate Script",
-                icon: session.recordType === "doc" ? "save" : "code",
-                onClick: onGenerate,
-                disabled: steps.length === 0 || !session.stopped,
-                title: !session.stopped
-                  ? "Stop recording first"
-                  : (steps.length === 0 ? "No steps yet" : (session.recordType === "doc" ? "Open export dialog" : "Generate output"))
-              }
-            : null
-        }
-        secondary={
-          session && session.recordType !== "doc" && session.recordType !== "inspect"
-            ? {
-                label: "Export Journey",
-                icon: "save",
-                onClick: () => onOpenJourney("html"),
-                disabled: steps.length === 0 || !session.stopped,
-                title: !session.stopped
-                  ? "Stop recording first"
-                  : (steps.length === 0 ? "No steps yet" : "Export as HTML")
-              }
-            : null
+          session && session.recordType !== "inspect" ? (
+            <ActiveExportMenu
+              session={session}
+              stepCount={steps.length}
+              onGenerateScript={onGenerate}
+              onExportWalkthrough={() => onOpenJourney("html")}
+            />
+          ) : null
         }
         onHelp={() => setAboutOpen(true)}
       />

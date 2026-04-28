@@ -264,7 +264,8 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
               display: "flex",
               flexDirection: "column",
               minHeight: 0,
-              maxHeight: leftHeight ? `${leftHeight}px` : undefined
+              maxHeight: leftHeight ? `${Math.max(leftHeight, 520)}px` : undefined,
+              minHeight: 420
             }}
           >
             <div className="card__header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
@@ -336,7 +337,7 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
                     const label = activeFolder === "__all__" ? `"${query}"` : activeFolder === "__unfiled__" ? "Unfiled" : `"${activeFolder}"`;
                     return <div className="recent-item__empty">No sessions in {label}.</div>;
                   }
-                  return <div className="sessions-scroll" style={{ flex: "1 1 0", overflowY: "auto", minHeight: 0 }}>
+                  return <div className="sessions-scroll" style={{ flex: "1 1 0", overflowY: "auto", minHeight: 220 }}>
                     <div className="sessions-list">
                     {filtered.map((s) => (
                       <div

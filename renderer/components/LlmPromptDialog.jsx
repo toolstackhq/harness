@@ -17,6 +17,7 @@ export default function LlmPromptDialog({ sessionId = null, onClose }) {
   const [framework, setFramework] = useState("Playwright");
   const [language, setLanguage] = useState("TypeScript");
   const [llm, setLlm] = useState("claude");
+  const [context, setContext] = useState("existing");
   const [extraNotes, setExtraNotes] = useState("");
   const [customDescription, setCustomDescription] = useState("");
   const [busy, setBusy] = useState(false);
@@ -30,6 +31,7 @@ export default function LlmPromptDialog({ sessionId = null, onClose }) {
         framework,
         language,
         llm,
+        context,
         extraNotes,
         customDescription
       });
@@ -75,6 +77,17 @@ export default function LlmPromptDialog({ sessionId = null, onClose }) {
               {LLM_PRESETS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
             </select>
             <div className="field__help">Adjusts persona phrasing — output format stays consistent.</div>
+          </div>
+          <div className="field">
+            <label className="field__label">Where will this run?</label>
+            <select className="field__input" value={context} onChange={(e) => setContext(e.target.value)}>
+              <option value="existing">Add to an existing test suite (respect current framework + patterns)</option>
+              <option value="new">Generate a fresh standalone project (scaffold from scratch)</option>
+            </select>
+            <div className="field__help">
+              <strong>Existing:</strong> single test file, no package.json or config touched.<br />
+              <strong>New:</strong> full scaffold including install / config / file layout.
+            </div>
           </div>
           <div className="field">
             <label className="field__label">Extra notes (optional)</label>

@@ -48,6 +48,25 @@ test("buildLlmPrompt includes user extra notes and custom framework description"
   assert.match(prompt, /Wrap in PageObjectModel/);
 });
 
+test("buildLlmPrompt context=existing tells the LLM not to touch package.json or config", () => {
+  const prompt = buildLlmPrompt(sampleSteps, {
+    framework: "Playwright", language: "TypeScript", llm: "claude", context: "existing"
+  });
+  assert.match(prompt, /existing test suite/);
+  assert.match(prompt, /Do NOT regenerate package\.json/);
+  assert.doesNotMatch(prompt, /fresh \/ empty project/);
+});
+
+test("buildLlmPrompt context=new asks for full scaffold + install commands", () => {
+  const prompt = buildLlmPrompt(sampleSteps, {
+    framework: "Playwright", language: "TypeScript", llm: "claude", context: "new"
+  });
+  assert.match(prompt, /fresh \/ empty project/);
+  assert.match(prompt, /Output every file as its own fenced block/);
+  assert.match(prompt, /install \+ run commands/);
+  assert.doesNotMatch(prompt, /Do NOT regenerate package\.json/);
+});
+
 test("buildLlmPrompt translates shadow DOM chains into pierce-syntax selector strings", () => {
   const prompt = buildLlmPrompt([
     { kind: "click", locator: { css: "#inner", shadowChain: ["my-host", "sub-host"], label: "Save" } }

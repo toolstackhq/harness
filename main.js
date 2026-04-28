@@ -1142,7 +1142,7 @@ function registerIpc() {
   });
 
   ipcMain.handle("sessions:export-llm-prompt", async (_e, payload = {}) => {
-    const { id, action, framework, language, llm, extraNotes, customDescription } = payload;
+    const { id, action, framework, language, llm, context, extraNotes, customDescription } = payload;
     let steps = [];
     if (id) {
       const sess = loadSessions().find((s) => s.id === id);
@@ -1153,7 +1153,7 @@ function registerIpc() {
     } else {
       return { ok: false, error: "No active session" };
     }
-    const prompt = buildLlmPrompt(steps, { framework, language, llm, extraNotes, customDescription });
+    const prompt = buildLlmPrompt(steps, { framework, language, llm, context, extraNotes, customDescription });
     if (action === "copy") {
       clipboard.writeText(prompt);
       return { ok: true, copied: true, length: prompt.length };

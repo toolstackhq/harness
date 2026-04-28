@@ -56,6 +56,7 @@ function buildLlmPrompt(steps, options = {}) {
   const framework = String(options.framework || "playwright").trim();
   const language = String(options.language || "javascript").trim();
   const llm = String(options.llm || "other").toLowerCase();
+  const context = String(options.context || "existing").toLowerCase();
   const extraNotes = String(options.extraNotes || "").trim();
   const customDescription = String(options.customDescription || "").trim();
   const persona = LLM_PHRASING[llm] || LLM_PHRASING.other;
@@ -71,6 +72,19 @@ function buildLlmPrompt(steps, options = {}) {
     lines.push(`Framework / runtime details supplied by the user: ${customDescription}`);
   }
   lines.push("");
+  lines.push("## Project context");
+  if (context === "new") {
+    lines.push("- This will land in a **fresh / empty project**. Scaffold whatever is needed: package.json, framework install command, config file, tsconfig if relevant, folder layout, and a runnable test file.");
+    lines.push("- Pick reasonable, idiomatic defaults — do not invent a custom in-house structure.");
+    lines.push("- Output every file as its own fenced block prefixed with the file path, e.g. `// path: tests/login.spec.ts`.");
+    lines.push("- Include the exact install + run commands at the end (e.g. `npm i -D @playwright/test && npx playwright test`).");
+  } else {
+    lines.push("- This will land in an **existing test suite**. Assume the framework, runner, base URL config, fixtures, helpers and folder convention are already set up.");
+    lines.push("- Do NOT regenerate package.json, framework config, tsconfig, .env, or CI workflows. Do not change any existing file unless strictly necessary.");
+    lines.push("- Match whatever Page Object / fixture / data-builder pattern the existing suite uses if hinted in the notes below; otherwise stay close to the framework's idiomatic test shape.");
+    lines.push("- Output a single new test file as one fenced block, prefixed with the suggested file path comment.");
+  }
+  lines.push("");
   lines.push("## Requirements");
   lines.push("- Use the exact selectors provided. Prefer the most stable form (id / data-testid / role) when there are alternatives.");
   lines.push("- Treat any value that looks like sample data (emails, names, account numbers) as a parameter. Hoist it to a constant or test parameter at the top of the file.");
@@ -78,7 +92,7 @@ function buildLlmPrompt(steps, options = {}) {
   lines.push("- For shadow DOM selectors written as `host >> child`, translate them into the framework's pierce syntax (e.g. Playwright's `>>`, Cypress `.shadow().find()`, Selenium's JS executor).");
   lines.push("- Wrap the whole flow in a single test or describe block named after the recorded URL.");
   lines.push("- If the framework needs imports / driver bootstrap, generate them. If driver setup depends on the user's machine (Selenium-Java for instance), explicitly call that out as a comment.");
-  lines.push("- Output only the final code in a fenced block, then a 2-3 line explanation. No marketing.");
+  lines.push("- After the code, give a 2-3 line explanation of any assumption you made. No marketing.");
   if (extraNotes) {
     lines.push("");
     lines.push("## Extra notes from the user");

@@ -48,6 +48,12 @@ Replay it whenever you want to check the flow still works.
 > # Task
 > Convert the recorded user flow below into a runnable **WebdriverIO** test, written in **TypeScript**.
 >
+> ## Project context
+> - This will land in an **existing test suite**. Assume the framework, runner, base URL config, fixtures, helpers and folder convention are already set up.
+> - Do NOT regenerate package.json, framework config, tsconfig, .env, or CI workflows. Do not change any existing file unless strictly necessary.
+> - Match whatever Page Object / fixture / data-builder pattern the existing suite uses if hinted in the notes below; otherwise stay close to the framework's idiomatic test shape.
+> - Output a single new test file as one fenced block, prefixed with the suggested file path comment.
+>
 > ## Requirements
 > - Use the exact selectors provided. Prefer the most stable form (id / data-testid / role) when there are alternatives.
 > - Treat any value that looks like sample data (emails, names, account numbers) as a parameter. Hoist it to a constant or test parameter at the top of the file.
@@ -194,6 +200,7 @@ Cucumber, Appium, k6, custom in-house runners), record the flow then
 - **Target framework** — Playwright, Cypress, Selenium, WebdriverIO, TestCafe, Robot, k6, Cucumber + WebDriver, Appium, or Custom (free-text description)
 - **Language** — JavaScript, TypeScript, Java, Python, C#, Ruby, Go
 - **Target LLM** — Claude, ChatGPT, Gemini, or generic
+- **Where will this run?** — *Add to an existing test suite* (LLM stays in lane, single test file, no package.json edits) or *Generate a fresh standalone project* (full scaffold: install commands, config, folder layout, runnable test file)
 - **Extra notes** — free-text guidance (Page Object Model, parameterise these values, target staging only, etc)
 
 Click **Copy to clipboard** or **Save as .txt**. The prompt looks like:

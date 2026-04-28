@@ -1024,10 +1024,10 @@ a:hover { text-decoration: underline; }
 .sessions-list { display: flex; flex-direction: column; }
 .session-row {
   display: grid;
-  grid-template-columns: 32px 1fr auto auto;
-  gap: 12px;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto auto;
+  gap: 10px;
   align-items: center;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 4px;
   cursor: pointer;
 }
@@ -1244,6 +1244,37 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 0 0 2px rgba(52,168,83,0.25);
   transform: scale(1.05);
 }
+.folder-chip-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: 16px;
+  background: var(--grey-100);
+  border: 1px solid var(--grey-300);
+  overflow: hidden;
+}
+.folder-chip-wrap--active { background: var(--blue-light); border-color: var(--blue); }
+.folder-chip-wrap--drop {
+  background: var(--green-bg);
+  border-color: var(--green-bar);
+  box-shadow: 0 0 0 2px rgba(52,168,83,0.25);
+}
+.folder-chip--inwrap {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 4px 10px !important;
+}
+.folder-chip__x {
+  border: 0;
+  background: transparent;
+  color: var(--grey-600);
+  cursor: pointer;
+  padding: 0 8px;
+  font-size: 14px;
+  line-height: 1;
+  align-self: center;
+}
+.folder-chip__x:hover { color: var(--red); background: var(--red-bg); }
 .token-chip {
   background: var(--blue-light);
   color: var(--blue-dark);
@@ -1451,9 +1482,8 @@ a:hover { text-decoration: underline; }
 
 .session-row__actions {
   display: flex;
-  gap: 4px;
-  margin-left: 8px;
-  opacity: 0;
+  gap: 2px;
+  opacity: 0.35;
   transition: opacity 120ms;
 }
 .session-row:hover .session-row__actions { opacity: 1; }

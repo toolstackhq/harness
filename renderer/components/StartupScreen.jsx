@@ -33,6 +33,7 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
   const [activeFolder, setActiveFolder] = useState("__all__");
   const [dragId, setDragId] = useState(null);
   const [dropTarget, setDropTarget] = useState(null);
+  const [knownFolders, setKnownFolders] = useState([]);
   const leftCardRef = useRef(null);
   const [leftHeight, setLeftHeight] = useState(null);
 
@@ -60,6 +61,7 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
       setViewport(settings.viewport || "desktop");
       setUrl(settings.lastUrl || "https://example.com");
       setMapping(JSON.stringify(settings.customMapping || {}, null, 2));
+      setKnownFolders(Array.isArray(settings.knownFolders) ? settings.knownFolders : []);
       await loadSessions();
     })();
     return () => { mounted = false; };
@@ -83,8 +85,19 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
   const folders = (() => {
     const set = new Set();
     for (const s of sessions) if (s.folder) set.add(s.folder);
+    for (const f of knownFolders) if (f) set.add(f);
     return [...set].sort((a, b) => a.localeCompare(b));
   })();
+
+  const persistFolders = async (next) => {
+    setKnownFolders(next);
+    try { await window.harness.settings.set({ knownFolders: next }); } catch (_) {}
+  };
+
+  const ensureFolderKnown = async (name) => {
+    if (!name || knownFolders.includes(name)) return;
+    await persistFolders([...knownFolders, name].sort((a, b) => a.localeCompare(b)));
+  };
 
   const onDeleteSession = async (e, s) => {
     e.stopPropagation();
@@ -103,14 +116,24 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
       s.folder || ""
     );
     if (target === null) return;
-    await window.harness.sessions.setFolder(s.id, target.trim() || null);
+    const targetName = target.trim() || null;
+    await window.harness.sessions.setFolder(s.id, targetName);
+    if (targetName) await ensureFolderKnown(targetName);
     await loadSessions();
   };
 
   const onCreateFolder = async () => {
     const name = window.prompt("New folder name:");
-    if (!name || !name.trim()) return;
-    setActiveFolder(name.trim());
+    const trimmed = (name || "").trim();
+    if (!trimmed) return;
+    await ensureFolderKnown(trimmed);
+    setActiveFolder(trimmed);
+  };
+
+  const onDeleteFolder = async (name) => {
+    if (!window.confirm(`Remove the empty folder "${name}"? Recordings already inside it stay assigned.`)) return;
+    await persistFolders(knownFolders.filter((f) => f !== name));
+    if (activeFolder === name) setActiveFolder("__all__");
   };
 
   const onRowDragStart = (e, s) => {
@@ -144,6 +167,7 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
     setDropTarget(null);
     if (!id) return;
     await window.harness.sessions.setFolder(id, folderName);
+    if (folderName) await ensureFolderKnown(folderName);
     await loadSessions();
   };
 
@@ -299,17 +323,28 @@ export default function StartupScreen({ onStart, onOpenSession, refreshKey = 0 }
                   className={`folder-chip${activeFolder === "__all__" ? " folder-chip--active" : ""}`}
                   onClick={() => setActiveFolder("__all__")}
                 >All</button>
-                {folders.map((f) => (
-                  <button
-                    key={f}
-                    className={`folder-chip${activeFolder === f ? " folder-chip--active" : ""}${dropTarget === f ? " folder-chip--drop" : ""}`}
-                    onClick={() => setActiveFolder(f)}
-                    onDragOver={(e) => onChipDragOver(e, f)}
-                    onDragLeave={() => onChipDragLeave(f)}
-                    onDrop={(e) => onChipDrop(e, f)}
-                    title={`Filter: ${f} · Drop a recording here to move it`}
-                  >📁 {f}</button>
-                ))}
+                {folders.map((f) => {
+                  const empty = !sessions.some((s) => s.folder === f);
+                  return (
+                    <span key={f} className={`folder-chip-wrap${activeFolder === f ? " folder-chip-wrap--active" : ""}${dropTarget === f ? " folder-chip-wrap--drop" : ""}`}>
+                      <button
+                        className={`folder-chip folder-chip--inwrap${activeFolder === f ? " folder-chip--active" : ""}`}
+                        onClick={() => setActiveFolder(f)}
+                        onDragOver={(e) => onChipDragOver(e, f)}
+                        onDragLeave={() => onChipDragLeave(f)}
+                        onDrop={(e) => onChipDrop(e, f)}
+                        title={`Filter: ${f} · Drop a recording here to move it`}
+                      >📁 {f}</button>
+                      {empty && (
+                        <button
+                          className="folder-chip__x"
+                          onClick={(e) => { e.stopPropagation(); onDeleteFolder(f); }}
+                          title="Remove this empty folder"
+                        >×</button>
+                      )}
+                    </span>
+                  );
+                })}
                 <button
                   className={`folder-chip${activeFolder === "__unfiled__" ? " folder-chip--active" : ""}${dropTarget === "__unfiled__" ? " folder-chip--drop" : ""}`}
                   onClick={() => setActiveFolder("__unfiled__")}

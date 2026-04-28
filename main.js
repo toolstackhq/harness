@@ -165,7 +165,8 @@ function getSettings() {
     },
     captureSensitive: false,
     lastUrl: "https://example.com",
-    customTokens: []
+    customTokens: [],
+    knownFolders: []
   };
   return { ...defaults, ...readJson(SETTINGS_PATH, {}) };
 }
